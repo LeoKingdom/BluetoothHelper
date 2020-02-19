@@ -1,3 +1,46 @@
-<resources>
-    <string name="app_name">blehelper</string>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="app_name">BluetoothHelper</string>
+    <string name="cancel" tools:ignore="ExtraTranslation">Cancel</string>
+    <string name="ok">Ok</string>
+    <string name="loading">加载中...</string>
+    <string name="button_abort">ABORT</string>
+    <string name="button_ok">OK</string>
+    <string name="dialog_upgrade_title">Upgrade in progress</string>
+    <string name="dialog_upgrade_error">An error has occurred during the upgrade, the upgrade is aborting.</string>
+    <string name="dialog_upgrade_error_from_board">The error occurs on the board which sent the following return code
+        information:</string>
+    <string name="dialog_upgrade_error_board_not_ready">The board is not ready for an upgrade, please try again
+        later.</string>
+    <string name="dialog_upgrade_error_exception">An exception occurs during the upgrade. Please try again
+        later or contact your application provider.</string>
+    <string name="dialog_upgrade_error_protocol_exception">A protocol exception occurs during the upgrade. Please try
+        again later or contact your application provider.</string>
+    <string name="dialog_upgrade_transfer_failed">The transfer failed during the upgrade. Please try
+        again later or contact your application provider.</string>
+    <string name="empty_content_description" />
+    <string name="alert_reconnection_title">Device disconnected</string>
+    <string name="alert_reconnection_message">Waiting for reconnection</string>
+    <string name="alert_upgrade_complete_title">Upgrade complete</string>
+    <string name="alert_upgrade_complete_message">The upgrade has successfully completed.</string>
+
+    <!-- ALERT - UPGRADE ALERT LOW BATTERY -->
+    <string name="alert_upgrade_low_battery_message">The battery is low on your audio device. Please connect it to a charger.</string>
+    <string name="alert_upgrade_low_battery_title">Low battery</string>
+
+    <!-- ALERT - UPGRADE COMMIT -->
+    <string name="alert_upgrade_commit_message">The data has been uploaded on the board and the board is ready for
+        the commit process. Do you want to commit your upload?</string>
+    <string name="alert_upgrade_commit_title">Data commit</string>
+
+    <!-- ALERT - UPGRADE TRANSFER COMPLETE -->
+    <string name="alert_upgrade_transfer_complete_message">Would you like to proceed?</string>
+    <string name="alert_upgrade_transfer_complete_title">File transfer complete</string>
+    <string name="alert_upgrade_sync_id_different_message">A previous unfinished upgrade has been processed with a
+        different file. By continuing the current upgrade the device will loose all information from that
+        previous upgrade.<br/>Do you want to continue?</string>
+    <string name="alert_upgrade_sync_id_different_title">File transfer complete</string>
+    <string name="button_continue">Continue</string>
+    <string name="alert_file_error_title">File error</string>
+    <string name="alert_file_error_message">Error when attempted to retrieve the selected file. Please try
+        again or select another one.</string>
 </resources>

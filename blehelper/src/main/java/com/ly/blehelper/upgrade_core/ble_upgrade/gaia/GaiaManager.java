@@ -5,11 +5,11 @@
 package com.ly.blehelper.upgrade_core.ble_upgrade.gaia;
 
 import android.os.Handler;
+import android.util.ArrayMap;
 import android.util.Log;
 
 
 import androidx.annotation.Nullable;
-import androidx.collection.ArrayMap;
 
 import com.ly.blehelper.upgrade_core.ble_upgrade.gaia.exceptions.GaiaException;
 import com.ly.blehelper.upgrade_core.ble_upgrade.gaia.packets.GaiaPacket;

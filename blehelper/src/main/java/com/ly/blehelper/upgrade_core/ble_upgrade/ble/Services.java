@@ -5,7 +5,8 @@
 package com.ly.blehelper.upgrade_core.ble_upgrade.ble;
 
 
-import androidx.collection.ArrayMap;
+
+import android.util.ArrayMap;
 
 import java.util.UUID;
 

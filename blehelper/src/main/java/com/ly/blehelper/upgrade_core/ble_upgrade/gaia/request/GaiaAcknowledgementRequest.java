@@ -5,7 +5,7 @@
 package com.ly.blehelper.upgrade_core.ble_upgrade.gaia.request;
 
 
-import com.ly.bluetoothhelper.oat.gaia.GAIA;
+import com.ly.blehelper.upgrade_core.ble_upgrade.gaia.GAIA;
 
 /**
  * The data structure to define an acknowledgement request.

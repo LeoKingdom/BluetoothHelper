@@ -1,0 +1,619 @@
+package com.trackerandroid.mkn0.ue.frag;
+
+
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
+import android.os.IBinder;
+import android.text.TextUtils;
+import android.util.Log;
+import android.view.View;
+import android.widget.Button;
+import android.widget.TextView;
+
+import com.github.greendao.bean.device.DevicePropertiesBean;
+import com.github.greendao.bean.device.DeviceUserBean;
+import com.hiber.impl.RootEventListener;
+import com.hiber.tools.layout.PercentLinearLayout;
+import com.ly.bluetoothhelper.beans.MsgBean;
+import com.ly.bluetoothhelper.callbacks.base_callback.WriteCallback;
+import com.ly.bluetoothhelper.callbacks.upgrade_callback.DataCallback;
+import com.ly.bluetoothhelper.callbacks.upgrade_callback.NotifyCallback;
+import com.ly.bluetoothhelper.callbacks.upgrade_callback.ProgressCallback;
+import com.ly.bluetoothhelper.callbacks.upgrade_callback.UpgradeStatusCallback;
+import com.ly.bluetoothhelper.helper.BluetoothHelper;
+import com.ly.bluetoothhelper.helper.PetTrackerHelper;
+import com.ly.bluetoothhelper.oat.service.TrackerBleService;
+import com.ly.bluetoothhelper.utils.ActionUtils;
+import com.ly.bluetoothhelper.utils.Consts;
+import com.ly.bluetoothhelper.utils.ZipUtils;
+import com.ly.bluetoothhelper.widget.ProgressDialogWidget;
+import com.trackerandroid.mkn0.R;
+import com.trackerandroid.mkn0.R2;
+import com.trackerandroid.mkn0.bean.FwDownloadBean;
+import com.trackerandroid.mkn0.helper.DeviceHelper;
+import com.trackerandroid.mkn0.helper.FWUpdateHelper;
+import com.trackerandroid.mkn0.helper.FileDownloadHelper;
+import com.trackerandroid.mkn0.helper.TimerHelper;
+import com.trackerandroid.mkn0.utils.ConfigureUtils;
+import com.trackerandroid.mkn0.utils.FileUtil;
+import com.trackerandroid.mkn0.widget.LoadingWidget;
+import com.trackerandroid.mkn0.widget.NormalDialogWidget;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.text.DecimalFormat;
+
+import butterknife.BindView;
+import butterknife.OnClick;
+import fastble.BleManager;
+import fastble.data.BleDevice;
+
+/**
+ * Frag_TrackerHomeSettingFirmwareUpdate
+ * create by yun.ling on 2020/01/10
+ * fota升级
+ */
+public class Frag_TrackerSettingFirmwareUpdate extends Frag_Base {
+    private final int FILE_NOT_DOWNLOAD = 0;//升级文件未下载
+    private final int FILE_DOWNLOADING = 1; //文件正在下载
+    private final int FILE_DOWNLOAD_FINISH = 2; //下载完成
+    private final int FILE__DOWNLOADED = 3; //文件已下载
+    private final int TRACKER_CAN_UPGRADE = 4; //fw可以升级
+    private final int TRACKER_UPGRADING = 5; //正在升级
+    private final int TRACKER_UPGRAD_INTERRUT = 6; //升级中断
+    private final int TRACKER_UPGRAD_FINISH = 7; //升级完成
+    private final int TRACKER_NOT_NEED_UPGRAD = 8; //tracker不需要升级
+
+    @BindView(R2.id.tv_titlebar_title)
+    TextView tvTitle;
+    @BindView(R2.id.ndw_tips)
+    NormalDialogWidget ndwTips;//提示消息框
+    @BindView(R2.id.ldw_loading)
+    LoadingWidget ldwLoading;//loading
+    @BindView(R2.id.tv_firmwareupdate_currentv)
+    TextView tvCVersion;//当前版本
+    @BindView(R2.id.tv_firmwareupdate_latestv)
+    TextView tvLVersion;//最新版本
+    @BindView(R2.id.bt_firmwareupdate)
+    Button btUpdate;//下载
+    @BindView(R2.id.fw_version_pll)
+    PercentLinearLayout versionLayout;
+    @BindView(R2.id.fw_download_pll)
+    PercentLinearLayout downloadLayout;
+    @BindView(R2.id.tv_firmwareupdate_progress_info)
+    TextView progressInfo;
+    @BindView(R2.id.tv_firmwareupdate_progress)
+    TextView progressTv;
+    @BindView(R2.id.update_dialog_widget)
+    ProgressDialogWidget progressDialogWidget;
+    private String bleMac; //蓝牙mac地址
+    private boolean isCheck = false;
+    private int CURRENT_STEP = -1;
+    private FwDownloadBean fwDownloadBean = new FwDownloadBean();//FW升级的信息
+    private FileDownloadHelper fileDownloadHelper;
+    private TrackerBleService trackerBleService;
+    private PetTrackerHelper trackerHelper;
+    private boolean isBond = false;
+    private DecimalFormat decimalFormat;
+    private BleDevice bleDevice;
+    private boolean canotFind = false;
+    private ComponentName componame = null;
+    private boolean isCompleted = false;
+    private boolean isReconn = false;
+    private ServiceConnection connection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            componame = name;
+            TrackerBleService.LocalBinder binder = (TrackerBleService.LocalBinder) service;
+            trackerBleService = binder.getService();
+//            otaUpgradeService.addHandler(mHandler);//暂不适用,蓝牙芯片升级时再打开
+            isBond = true;
+            Consts.betweenTimes = 25;
+            trackerBleService.connectDevice(bleMac);
+            setCallback();
+            Log.e("bind----", "ok");
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            isBond = false;
+        }
+    };
+
+    @Override
+    public int onInflateLayout() {
+        return R.layout.mkn0_frag_trackerhome_setting_firmwareupdate;
+    }
+
+    @Override
+    public void initViewFinish(View view) {
+        super.initViewFinish(view);
+        initView();//初始化view
+        trackerHelper = PetTrackerHelper.getInstance(activity.getApplication());
+    }
+
+    /**
+     * 初始化View
+     */
+    private void initView() {
+        //初始化弹窗
+        tvTitle.setText(R.string.mkn0_treackerhome_setting_firmwareupdate);
+        ndwTips.getTvTitle().setVisibility(View.VISIBLE);
+        ndwTips.getTvCancel().setOnClickListener(v -> ndwTips.hide());
+        ConfigureUtils.setButton(activity, btUpdate, true);
+        BleManager.getInstance().init(getActivity().getApplication()); //初始化蓝牙工具
+        if (!BluetoothHelper.isOpenBle()) {
+            BluetoothHelper.enableBle();
+        }
+
+    }
+
+    @Override
+    public boolean isReloadData() {
+        return false;
+    }
+
+    @Override
+    public void onNexts(Object o, View view, String s) {
+        if (o instanceof FwDownloadBean) {
+            FwDownloadBean fwDownloadBean = (FwDownloadBean) o;
+            updateView(fwDownloadBean);
+        }
+        DevicePropertiesBean propertiesBean = DeviceHelper.getSelectDeviceProperties();
+//        bleMac = "88:9E:33:EE:A7:4C";
+        bleMac = propertiesBean.bluetooth_address;
+        decimalFormat = new DecimalFormat("0.0");
+        ConfigureUtils.showBottomBar(activity, false);
+        setEventBus();
+    }
+
+    /**
+     * eventbus事件,处理扫描结果、断连、重连等
+     */
+    private void setEventBus() {
+        setEventListener(MsgBean.class, new RootEventListener<MsgBean>() {
+            @Override
+            public void getData(MsgBean msgBean) {
+                String action1 = msgBean.getAction1();
+                String action2 = msgBean.getAction2();
+                Object o = msgBean.getObject();
+                Log.e("action----", action1 + "/" + action2);
+                if (!isCompleted) { //升级完成不再走这里
+                    if (action2.equals(PetTrackerHelper.BLE_SCAN_FINISH)) {
+                        if (o == null) { //没找到设备
+                            if (!canotFind) { //只提示一次就ok
+                                toast("Can't find your tracker", 2000);
+                                ldwLoading.hide();
+                                canotFind = true;
+                            }
+                        } else { //能找到设备,初始化升级数据
+                            trackerBleService.initData(fwDownloadBean.getUnZipPath());
+                        }
+
+//                    canConn=false;
+                    } else if (action2.equals(PetTrackerHelper.BLE_CONNECT_SUCCESS)) {//连接成功,开始升级
+                        if (!isReconn) {
+                            startUpgrade();
+                            bleDevice = (BleDevice) o;
+                        }
+                    } else if (action2.equals(PetTrackerHelper.BLE_RECONNECT_SUCCESS)) {//连接成功,开始升级
+                        if (isReconn) {
+//                            reUpgrade();
+                            progressDialogWidget.getTvOk().setText("继续");
+                            progressDialogWidget.setTvTitle("提示");
+                            progressDialogWidget.getCurrentPacket().setText("设备已连接");
+                            progressDialogWidget.getProgressNumTv().setVisibility(View.GONE);
+                            bleDevice = (BleDevice) o;
+                        }
+                    } else if (action2.equals(PetTrackerHelper.BLE_CONNECT_FAIL)) {
+                        if (!canotFind) {
+                            toast("Can't connect to your tracker", 2000);
+                        }
+                        ldwLoading.hide();
+                    } else if (action2.equals(PetTrackerHelper.BLE_DISCONNECT)) {
+                        bleDevice = null;
+                        isReconn = true;
+                        canotFind = false;
+                        progressDialogWidget.setSingleChoice();
+                        progressDialogWidget.getTvOk().setText("重连");
+                        progressDialogWidget.setTvTitle("提示");
+                        progressDialogWidget.getCurrentPacket().setText("设备连接断开");
+                        progressDialogWidget.getProgressNumTv().setVisibility(View.GONE);
+                        progressDialogWidget.show();
+                        trackerBleService.eventBusCall(PetTrackerHelper.BLE_DISCONNECT);
+                    }
+                }
+            }
+        });
+
+        progressDialogWidget.getTvOk().setOnClickListener((v -> {
+            if (progressDialogWidget.getTvOk().getText().equals("继续")) {
+                ldwLoading.show();
+                reUpgrade();
+                progressDialogWidget.hide();
+            }
+        }));
+    }
+
+
+    @Override
+    public boolean onBackPresss() {
+        back();
+        return true;
+    }
+
+    @OnClick(R2.id.bt_firmwareupdate)
+    void update() {
+        String updateTxt = btUpdate.getText().toString();
+        if (updateTxt.equals(getRootString(R.string.check_for_update))) {
+            isCheck = true;
+            checkUpdate();
+        } else if (updateTxt.equals(getRootString(R.string.mkn0_ok))) {
+            downloadLayout.setVisibility(View.GONE);
+            versionLayout.setVisibility(View.VISIBLE);
+            updateView(fwDownloadBean);
+        } else {
+            isCompleted = false;
+            ndwTips.show();
+        }
+    }
+
+    @OnClick(R2.id.tv_titlebar_leftfirst)
+    void back() {
+        if (ldwLoading.isShown()) {
+            ldwLoading.hide();
+            return;
+        }
+        if (ndwTips.isShown()) {
+            ndwTips.hide();
+            return;
+        }
+        if (progressDialogWidget.isShown()){
+            progressDialogWidget.hide();
+            return;
+        }
+        MsgBean msgBean=new MsgBean();
+        msgBean.setAction1("notify.open");
+        msgBean.setMacAddress(bleMac);
+        sendEvent(msgBean,true);
+        if (isBond) {
+            connection.onServiceDisconnected(componame);
+            activity.unbindService(connection);
+        }
+        toFrag(getClass(), Frag_TrackerHomeSetting.class, null, false, getClass());
+    }
+
+    private void startUpgrade() {
+        //停止location的notify
+        sendToBluetoothService("notify.close");
+        trackerBleService.connectDevice(bleMac);
+        new TimerHelper(activity) {
+            @Override
+            public void doSomething() {
+                ldwLoading.hide();
+                trackerBleService.startUpgrade(null);
+            }
+
+            @Override
+            public void finish() {
+            }
+        }.startDelay(1500);
+    }
+
+    private void reUpgrade() {
+        isReconn = false;
+        sendToBluetoothService("notify.close");
+        trackerBleService.connectDevice(bleMac);
+        new TimerHelper(activity) {
+            @Override
+            public void doSomething() {
+                ldwLoading.hide();
+                trackerBleService.setResendData();
+            }
+
+            @Override
+            public void finish() {
+            }
+        }.startDelay(1500);
+    }
+
+    private String getLastVersion(String cVersion) {
+        String currentV = cVersion;
+        //取版本后六位
+        if (!TextUtils.isEmpty(cVersion)) {
+            if (cVersion.contains(".")) {
+                currentV = currentV.replace(".", "");
+            }
+            if (cVersion.contains("_")) {
+                currentV = currentV.replace("_", "");
+            }
+            if (currentV.length() >= 6) {
+                currentV = currentV.substring(currentV.length() - 6);
+            }
+        }
+        return currentV;
+    }
+
+    /**
+     * 更新页面
+     *
+     * @param fwDownloadBean 升级消息
+     */
+    private void updateView(FwDownloadBean fwDownloadBean) {
+        this.fwDownloadBean = fwDownloadBean;
+        tvCVersion.setText(getString(R.string.mkn0_firmwareupdate_cversion, getLastVersion(fwDownloadBean.getCurrent_version())));
+        tvLVersion.setText(getString(R.string.mkn0_firmwareupdate_lversion, fwDownloadBean.getNew_version()));
+        ndwTips.getTvOk().setText(R.string.download);
+        btUpdate.setText(R.string.mkn0_update);
+        if (fwDownloadBean.isHasUpdate()) {
+            //设置页面信息
+            tvCVersion.setVisibility(View.VISIBLE);
+            tvLVersion.setVisibility(View.VISIBLE);
+//            btUpdate.setVisibility(View.VISIBLE);
+            ndwTips.getTvTitle().setText(getString(R.string.mkn0_firmwareupdate_nversion, fwDownloadBean.getNew_version()));
+            File file = new File(FileUtil.getExternalFotaPath() + fwDownloadBean.getFileName());
+            if (file.exists() && file.length() == fwDownloadBean.getSize()) {//文件存在直接同步
+                CURRENT_STEP = FILE__DOWNLOADED;
+                float size = (float) fwDownloadBean.getSize() / 1024 / 1024;
+                String sizeFinal = size == 0 ? "0" : new DecimalFormat("0.0000").format(size);
+                ndwTips.getTvContent().setText(getString(R.string.mkn0_firmwareupdate_vcontent, sizeFinal + "MB"));
+                ndwTips.getTvOk().setOnClickListener(v -> {
+                    ndwTips.hide();
+                    DevicePropertiesBean properties = DeviceHelper.getSelectDeviceProperties();
+                    if (!BluetoothHelper.isOpenBle()) {
+                        toBluetooth();
+                    }
+                    //正式发版时打开,现在为了方便调试
+                    else if (properties.power < 50) {
+                        toast(R.string.mkn0_power_less_than_fifth_per, 2000);
+                    } else {
+                        ldwLoading.show();
+                        fwDownloadBean.setUnZipPath(FileUtil.getFotaUnzipPath());
+                        BleDevice device = trackerHelper.getConnectDevice(bleMac);
+                        Log.e("device----u", device + "");
+                        if (device == null) {
+                            //搜索tracker
+                            ldwLoading.setLoadingText(getRootString(R.string.searching));
+                            searchBle();
+//                            trackerBleService.scanToConn("ble.upgrade", "conn");
+                        } else {
+                            bleDevice = device;
+                            trackerBleService.initData(fwDownloadBean.getUnZipPath());
+                            startUpgrade();
+                        }
+                    }
+                });
+            } else {//文件不存在或者下载的文件不完整;若不完整则先删除，再下载
+                try {
+                    FileUtil.deleteFotaFile();
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                }
+                CURRENT_STEP = FILE_NOT_DOWNLOAD;
+                float size = (float) fwDownloadBean.getSize() / 1024 / 1024;
+                String sizeFinal = size == 0 ? "0" : new DecimalFormat("0.0000").format(size);
+                ndwTips.getTvContent().setText(getString(R.string.mkn0_firmwareupdate_vcontent, sizeFinal + "MB"));
+//                ndwTips.getTvContent().setText(getString(R.string.mkn0_firmwareupdate_download_dialog, fwDownloadBean.getFileName()));
+                ndwTips.getTvOk().setOnClickListener(v -> {
+                    ndwTips.hide();
+                    initDHelper();
+//                    toFrag(getClass(), Frag_SettingFirmwareUpdateDownload.class, fwDownloadBean, true, 50);
+                });
+            }
+        } else {
+            tvCVersion.setVisibility(View.VISIBLE);
+            tvLVersion.setVisibility(View.GONE);
+            btUpdate.setText(R.string.check_for_update);
+            if (isCheck) {
+                CURRENT_STEP = TRACKER_NOT_NEED_UPGRAD;
+                toast(getString(R.string.mkn0_firmwareupdate_toast), 3000);
+                isCheck = false;
+            }
+        }
+    }
+
+    private void searchBle() {
+        new TimerHelper(activity) {
+            @Override
+            public void doSomething() {
+                BleDevice device = trackerHelper.getConnectDevice(bleMac);
+                if (device == null) {
+                    toast("Can't find your tracker", 2000);
+                    ldwLoading.hide();
+                }
+            }
+
+            @Override
+            public void finish() {
+
+            }
+        }.startDelay(15000);
+    }
+
+    private void sendToBluetoothService(String action) {
+        DeviceUserBean userBean = DeviceHelper.getSelectUser();
+        MsgBean msgBean = new MsgBean();
+        msgBean.settName(userBean.getNickname());
+        msgBean.setMacAddress(bleMac);
+        msgBean.setAction1(action);
+        sendEvent(msgBean, true);
+    }
+
+    private void toBluetooth() {
+        ndwTips.show();
+        ndwTips.getTvTitle().setVisibility(View.GONE);
+        ndwTips.getTvContent().setText(R.string.mkn0_firmwareupdate_bluetooth);
+        ndwTips.getTvOk().setOnClickListener(v -> {
+            ndwTips.hide();
+            BluetoothHelper.enableBle();
+            Frag_SettingVirtual.lastFrag = getClass();
+            toFrag(getClass(), Frag_SettingFirmwareUpdateSync.class, fwDownloadBean, true, 50);
+        });
+    }
+
+    /**
+     * 检查版本更新
+     */
+    private void checkUpdate() {
+        FWUpdateHelper fwUpdateHelper = new FWUpdateHelper();
+        //loading show
+        fwUpdateHelper.setOnPreparehelperListener(() -> ldwLoading.show());
+        //loading hide
+        fwUpdateHelper.setOnDonehelperListener(() -> ldwLoading.hide());
+        //请求失败
+        fwUpdateHelper.setOnAppErrorListener((throwable) -> toast(R.string.mkn0_can_not_connect_server, 2000));
+        //请求错误
+        fwUpdateHelper.setOnServerErrorListener((serverError) -> toast(serverError.error_msg, 2000));
+        //页面更新
+        fwUpdateHelper.setOnCheckUpdateListener(this::updateView);
+        //检查版本更新
+        fwUpdateHelper.checkHaveFWUpdate();
+    }
+
+    /**
+     * 初始化下载文件的Helper
+     */
+    private void initDHelper() {
+        ldwLoading.show();
+        ConfigureUtils.setButton(activity, btUpdate, false);
+        fileDownloadHelper = new FileDownloadHelper();
+        fileDownloadHelper.prepareHelperNext();
+        fileDownloadHelper.setOnDownloadfileFailListener(() -> {//下载失败
+            try {
+                FileUtil.deleteFotaFile();//删除文件
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }
+            ldwLoading.hide();
+            versionLayout.setVisibility(View.GONE);
+            progressTv.setText(R.string.mkn0_firmwareupdate_fail);
+            progressInfo.setText(R.string.mkn0_fw_download_fail_info);
+            downloadLayout.setVisibility(View.VISIBLE);
+        });
+        fileDownloadHelper.setOnDownloadfileSuccessListener((filePath) -> {//下载成功
+            //因为下载的升级包都是zip压缩包,所以需要解压
+            String unZipPath = filePath.substring(0, filePath.lastIndexOf("/")) + "/unzip";
+            fwDownloadBean.setUnZipPath(unZipPath);
+            try {
+                File unzipFile = new File(unZipPath);
+                if (!unzipFile.exists()) {
+                    unzipFile.mkdirs();
+                }
+                ZipUtils.unzipFolder(filePath, unZipPath);
+                BleDevice device = trackerHelper.getConnectDevice(bleMac);
+                if (device == null) {
+                    ldwLoading.setLoadingText(getRootString(R.string.searching));
+                    searchBle();
+//                    trackerBleService.scanToConn("ble.upgrade", "conn");
+                } else {
+                    bleDevice = device;
+                    trackerBleService.initData(fwDownloadBean.getUnZipPath());
+                    trackerBleService.startUpgrade(null);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+        });
+        fileDownloadHelper.setOnDownloadProgressListener((progressStr -> {//正在下载
+
+        }));
+        fileDownloadHelper.startDownload(fwDownloadBean.getFilePath(), fwDownloadBean.getFileName());
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        activity.bindService(new Intent(getActivity(), TrackerBleService.class), connection, Context.BIND_AUTO_CREATE);
+//        activity.bindService(new Intent(getActivity(), UpgradeFotaAndBleService.class), connection, Context.BIND_AUTO_CREATE);
+    }
+
+    private void setCallback() {
+        trackerBleService.setNotifyCallback(new NotifyCallback() {
+            @Override
+            public void onNext() {
+                Log.e("notifyOpen---", "success");
+                trackerBleService.enableMaximumMTU(true);//ble升级需要
+            }
+
+            @Override
+            public void error(String o) {
+                Log.e("notifyOpen---", "fail---" + o.toString());
+            }
+        });
+
+        trackerBleService.setWriteCallback(new WriteCallback() {
+            @Override
+            public void writeSuccess(int actionType, int current, int total, byte[] justWrite) {
+                if (actionType == ActionUtils.ACTION_OTA_ORDER_I) {
+
+                } else if (actionType == ActionUtils.ACTION_OTA_DATA_HEAD_I) {
+
+                } else {
+
+                }
+            }
+        });
+
+        trackerBleService.setProgressCallback(new ProgressCallback() {
+            @Override
+            public void setMax(int max) {
+                ldwLoading.hide();
+                versionLayout.setVisibility(View.GONE);
+                progressTv.setTextColor(getRootColor(R.color.mkn0_cr_FF398EFF));
+                progressInfo.setText(R.string.mkn0_fw_upgrading_tip);
+                downloadLayout.setVisibility(View.VISIBLE);
+//                progressDialogWidget.setProgressMax(max);
+//                progressDialogWidget.setProgressNumTvText(0 + "%");
+//                progressDialogWidget.show();
+                ConfigureUtils.setButton(activity, btUpdate, false);
+            }
+
+            @Override
+            public void setProgress(float percent, int current, int totalFrame, int currentFrame, int currentBin, int totalBin) {
+
+                String percentString = decimalFormat.format(percent);
+                progressTv.setText(getRootString(R.string.download) + "ed：" + percentString + "%");
+                if (percent >= 100) {
+                    isCompleted = true;
+                    progressTv.setTextColor(getRootColor(R.color.mkn0_black));
+                    progressTv.setText(R.string.mkn0_firmwareupdate_complete);
+                    progressInfo.setText(R.string.mkn0_firmwar_sync_send_finish);
+                    btUpdate.setText(R.string.mkn0_ok);
+                    ConfigureUtils.setButton(activity, btUpdate, true);
+                    sendToBluetoothService("notify.open");
+                }
+//                progressDialogWidget.getProgressNumTv().setText( percentString+ "%");
+            }
+        });
+
+        trackerBleService.setDataCallback(new DataCallback() {
+
+            @Override
+            public void done() {
+                //传输完成
+//                progressDialogWidget.setProgressNumTvText("传输完成!");
+//                progressDialogWidget.showCloseBtnWithText("Done");
+            }
+        });
+
+        trackerBleService.setUpgradeStatusCallback(new UpgradeStatusCallback() {
+//            @Override
+//            public void deviceNotConnect() {
+//                super.deviceNotConnect();
+//            }
+//
+//            @Override
+//            public void connSuccess(BleDevice bleDevice) {
+//
+//            }
+//
+//            @Override
+//            public void reConnSuccess(BleDevice bleDevice) {
+//
+//            }
+        });
+    }
+}
