@@ -1,2 +1,2 @@
-include ':app', ':blehelper'
+include ':app', ':blehelper', ':qcommesim'
 rootProject.name='BluetoothHelper'

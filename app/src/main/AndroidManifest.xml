@@ -17,7 +17,6 @@
         android:theme="@style/AppTheme"
         android:networkSecurityConfig="@xml/network_config"
         tools:ignore="GoogleAppIndexingWarning">
-        <activity android:name=".UpgradeActivity" />
         <activity android:name=".EsimActivity" />
 
         <activity android:name=".Main">
@@ -27,7 +26,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <service android:name="com.ly.blehelper.upgrade_core.service.TrackerBleService"/>
+        <activity android:name=".QcommUpgradeActivity1"/>
+        <service android:name="com.ly.qualcomm.service.QcommBleService"/>
 
     </application>
 

@@ -17,4 +17,12 @@
         android:textSize="30sp"
         android:layout_marginTop="@dimen/dp_20"
         android:onClick="toUpgrade"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="高通升级"
+        android:textSize="30sp"
+        android:layout_marginTop="@dimen/dp_20"
+        android:onClick="toGTUpgrade"/>
 </LinearLayout>

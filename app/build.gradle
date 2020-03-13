@@ -5,7 +5,7 @@ android {
     buildToolsVersion "28.0.3"
     defaultConfig {
         applicationId "com.ly.bluetoothhelper"
-        minSdkVersion 19
+        minSdkVersion 21
         targetSdkVersion 28
         versionCode 1
         versionName "1.0"
@@ -29,6 +29,14 @@ repositories {
     }
 }
 
+//当module引入了aar或者jar时必须在引用此module的build.gradle中加入以下代码
+repositories {
+//    flatDir {
+////        dirs project(':esimhelper').file('libs')
+////        dirs project(':blehelper').file('libs')
+//    }
+}
+
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation 'com.android.support:appcompat-v7:28.0.0'
@@ -41,5 +49,10 @@ dependencies {
 //    api(name: "xhelper_6_12", ext: 'aar')
 //    api(name: "ma_xutils", ext: 'aar')
     implementation 'com.squareup.retrofit2:retrofit:2.7.0'
-    implementation project(path: ':blehelper')
+    implementation project(path: ':qcommesim')
+//    implementation project(path: ':esimhelper')
+//    implementation project(path: ':qualcomm')
+    api(name: "de_esim-v0.0.1", ext: 'aar')
+//    api(name: "blehelper", ext: 'aar')
+    api(name: "fastble", ext: 'aar')
 }

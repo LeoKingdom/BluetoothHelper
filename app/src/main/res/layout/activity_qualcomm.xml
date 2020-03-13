@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        >
+
+        <TextView
+            android:id="@+id/scan_and_conn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:onClick="scan"
+            android:text="扫描并连接"
+            android:textSize="30sp"
+            android:visibility="invisible"
+            android:clickable="false"
+            />
+
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="20dp"
+            >
+            <EditText
+                android:id="@+id/mac_et"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="设置MAC地址"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:singleLine="true"
+                android:clickable="false"
+                android:inputType="text"
+                />
+            <Button
+                android:onClick="connect"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="连接设备"
+                />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="20dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="write"
+                android:text="高通蓝牙升级"
+                android:textSize="30sp" />
+            <Button
+                android:id="@+id/gt_btn"
+                android:layout_width="80dp"
+                android:layout_height="40dp"
+                android:text="开始"
+                android:layout_marginLeft="20dp"
+                android:background="@drawable/btn_bg_selector"
+                android:enabled="false"
+                android:textColor="@color/color_white"/>
+        </LinearLayout>
+
+    </LinearLayout>
+    <com.ly.blehelper.core.widget.ProgressDialogWidget
+        android:id="@+id/progress_dialog"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"/>
+    <com.ly.blehelper.core.widget.LoadingWidget
+        android:id="@+id/main_loading_widget"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_centerInParent="true"
+        android:visibility="gone"/>
+</RelativeLayout>

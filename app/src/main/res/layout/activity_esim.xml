@@ -82,12 +82,12 @@
             android:text="ok"
             android:onClick="urlSet"/>
     </LinearLayout>
-    <com.ly.blehelper.widget.ProgressDialogWidget
+    <com.ly.blehelper.core.widget.ProgressDialogWidget
         android:id="@+id/progress_dialog"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="gone"/>
-    <com.ly.blehelper.widget.LoadingWidget
+    <com.ly.blehelper.core.widget.LoadingWidget
         android:id="@+id/main_loading_widget"
         android:layout_width="match_parent"
         android:layout_height="match_parent"

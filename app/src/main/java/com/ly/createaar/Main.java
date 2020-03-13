@@ -24,6 +24,9 @@ public class Main extends Activity {
         startActivity(new Intent(this,EsimActivity.class));
     }
     public void toUpgrade(View view){
-        startActivity(new Intent(this, UpgradeActivity.class));
+//        startActivity(new Intent(this, UpgradeActivity.class));
+    }
+    public void toGTUpgrade(View view){
+        startActivity(new Intent(this, QcommUpgradeActivity1.class));
     }
 }
