@@ -1,2 +1,3 @@
-include ':app', ':blehelper', ':qcommesim'
+include ':app', ':blehelper', ':qcommesim', ':qcommesim3'
 rootProject.name='BluetoothHelper'
+project(':qcommesim3').projectDir = new File('qcommesim2')

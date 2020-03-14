@@ -28,14 +28,13 @@ import com.ly.qcommesim.qcomm.upgrade.UploadProgress;
 import java.io.File;
 
 
-public abstract class QualcommHelper{
+public abstract class QualcommHelper extends BleBaseHelper {
     private Context mContext;
     private String macAddress;
     private File mUpgradeFile;
     private BleDevice device;
     private QcommBleService qcommBleService;
     private boolean bondService = false;
-    private BleBaseHelper bleBaseHelper;
     /**
      * 初始化必要参数
      *
@@ -45,17 +44,16 @@ public abstract class QualcommHelper{
      * @return
      */
     public QualcommHelper(Application application,Context context, String mac, String filePath) {
-        bleBaseHelper=new BleBaseHelper(application);
+        super(application);
         this.mContext = context;
         this.macAddress = mac;
         this.mUpgradeFile = new File(filePath);
-        init();
     }
 
 
 
     private void scanDevice() {
-        bleBaseHelper.scanAndConnect(true, macAddress.toUpperCase(), "", new ScanConnectCallback() {
+        scanAndConnect(true, macAddress.toUpperCase(), "", new ScanConnectCallback() {
             @Override
             public void onScanFinished(BleDevice bleDevice) {
 
@@ -89,8 +87,8 @@ public abstract class QualcommHelper{
         });
     }
 
-
-    private final void init() {
+    @Override
+    public final void init() {
         //蓝牙芯片升级不需要此uuid
     }
 
@@ -123,12 +121,12 @@ public abstract class QualcommHelper{
             macInvalidate();
             return;
         }
-        if (!bleBaseHelper.isBleOpen()) {
+        if (!isBleOpen()) {
             phoneBleDisable();
             return;
         }
 
-        BleDevice tDevice = bleBaseHelper.getConnectDevice(macAddress.toUpperCase());
+        BleDevice tDevice = getConnectDevice(macAddress.toUpperCase());
         if (tDevice == null || device == null) {
             scanDevice();
             return;

@@ -22,25 +22,20 @@ import com.ly.qcommesim.core.utils.CRCCheckUtils;
 import com.ly.qcommesim.core.utils.DataPacketUtils;
 import com.ly.qcommesim.core.utils.OrderSetUtils;
 import com.ly.qcommesim.core.utils.TransformUtils;
-import com.ly.qcommesim.esim.ESimActiveHelper;
-import com.xble.xble.core.BaseHelper;
-import com.xble.xble.core.log.Logg;
+import com.ly.qcommesim.esim.bean.EsimData;
+import com.ly.qcommesim.esim.bean.EsimDevice;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
-
 
 /**
  * author: LingYun
  * email: SWD-yun.ling@jrdcom.com
- * date: 2019/10/15 11:11
- * version: 1.0
+ * date: 2020/3/13 19:18
+ * version: 2.0
  * <p>
  * esim卡工具类,主要为外围设备和中心设备围绕esim展开的交互(蓝牙)
  */
-public abstract class ESimActiveHelper extends BaseHelper {
-    private static final String TAG = "ESimHelper";
+public abstract class ESimHelper  {
     private final int DATA_TIMEOUT = 1000;
     private final int DATA_CHECK = 1001;//校验数据
     private final int URL_RESPONSE = 1002;//回复url数据是否正确
@@ -48,25 +43,17 @@ public abstract class ESimActiveHelper extends BaseHelper {
     private final int PREPARE_URL_TRANSFORM = 1004;//准备传输url
     private final int BEGIN_URL_TRANSFORM = 1005;//开始传输url
     private final int BEGIN_ACTIVE = 1006;//开始第一步下载profile
-    private String mMac;
-    private String mUrl;
-    private BleDevice bleDevice;
+    private EsimDevice esimDevice;
+    private EsimData esimData;
     private int tLength = 0;
-    private int CURRENT_ACTION = -1; //激活第一步,即请求获取url
-    private byte[] dataBytes;
-    private int packets; //每次回复需要接收的包数
-    private int sumPackets = 0;//已收包数
-    private List<Integer> sumPacketList = new ArrayList<>();
-    private byte[] headBytes;
-    private int totalFrame;
-    private int currentFrame = 0;
     private byte[] jsonBodyBytes;
     private byte currentEventId;
     private String url;
     private String postData;
-    private ESimActiveHelper.EsimEnum esimEnum;
-    private String defualtUrl = "1$53d22361.cpolar.cn$04386-AGYFT-A74Y8-3F815";
+    private EsimEnum esimEnum;
     private BleBaseHelper bleBaseHelper;
+    private String defualtUrl = "1$53d22361.cpolar.cn$04386-AGYFT-A74Y8-3F815";
+
     public enum EsimEnum {
         ESIM_ACTIVE,
         ESIM_CANCEL,
@@ -78,7 +65,7 @@ public abstract class ESimActiveHelper extends BaseHelper {
         @Override
         public void writeSuccess(int actionType, int current, int total, byte[] justWrite) {
             Log.e("write----", Arrays.toString(justWrite));
-            if (CURRENT_ACTION == ActionUtils.ACTION_ESIM_URL) {
+            if (esimData.getStepAction() == ActionUtils.ACTION_ESIM_URL) {
                 handler.sendEmptyMessageDelayed(BEGIN_URL_TRANSFORM, 20);
             }
         }
@@ -95,15 +82,16 @@ public abstract class ESimActiveHelper extends BaseHelper {
             switch (msg.what) {
                 case DATA_TIMEOUT: //超时,做丢包逻辑
 //                    CURRENT_ACTION = 1; //将url字节转换
-                    if (sumPackets == 0 && sumPackets == packets) { //未丢包,下一步做处理
+                    if (esimData.getSumPackets() == 0 && esimData.getSumPackets() == esimData.getPackets()) { //未丢包,下一步做处理
                         return;
                     }
-                    if (sumPackets != 0) { //丢包处理
+                    if (esimData.getSumPackets() != 0) { //丢包处理
 
                     }
                     break;
                 case DATA_CHECK: //数据校验
-                    if (dataBytes == null) return;
+                    byte[] dataBytes = esimData.getDataBytes();
+                    if (esimData.getDataBytes() == null) return;
 //                    Log.e("bytes---", TransformUtils.bytesToHexString(dataBytes));
                     byte crcByte = dataBytes[dataBytes.length - 1];//最后一个字节为crc校验
                     byte[] dataByte = Arrays.copyOfRange(dataBytes, 0, dataBytes.length - 1);
@@ -116,13 +104,13 @@ public abstract class ESimActiveHelper extends BaseHelper {
                     }
                     if (crcByte == crcByte1) { //数据正确
                         Message message = handler.obtainMessage();
-                        if (CURRENT_ACTION == 0) { //url数据正确
+                        if (esimData.getStepAction() == 0) { //url数据正确
                             url = data;
                             byte[] responeBytes = TransformUtils.combineArrays(OrderSetUtils.ESIM_PROFILE_DOWNLOAD_URL_RESP, new byte[]{0, 0});
                             message.what = URL_RESPONSE;
                             message.obj = responeBytes;
                             handler.sendMessageDelayed(message, 200);
-                        } else if (CURRENT_ACTION == 4) { //post数据正确
+                        } else if (esimData.getStepAction() == 4) { //post数据正确
                             postData = data;
                             httpResponse(url, postData);
 //                            esimUrlPostListener.urlPostSuccess(CURRENT_STEP, data);
@@ -130,59 +118,60 @@ public abstract class ESimActiveHelper extends BaseHelper {
                             urlResBytes[2] = (byte) 0x02;
                             urlResBytes[6] = currentEventId;
                             byte[] urlResponseBytes = TransformUtils.combineArrays(urlResBytes, new byte[]{0, 0});
-                            bleBaseHelper.writeCharacteristic(bleDevice, urlResponseBytes, writeListener);
-                            CURRENT_ACTION = 3;
+                            bleBaseHelper.writeCharacteristic(esimDevice.getBleDevice(), urlResponseBytes, writeListener);
+                            esimData.setStepAction(3);
                         }
                     } else { //数据错误
-                        if (CURRENT_ACTION == 0) { //url数据错误
+                        if (esimData.getStepAction() == 0) { //url数据错误
 
-                        } else if (CURRENT_ACTION == 4) { //post数据错误
+                        } else if (esimData.getStepAction() == 4) { //post数据错误
 
                         }
                     }
 //                    CURRENT_ACTION = 2; //数据校验
                     break;
                 case URL_RESPONSE:
-                    CURRENT_ACTION = 3;//url校验回复,下一步获取请求的post param
+                    //url校验回复,下一步获取请求的post param
+                    esimData.setStepAction(3);
                     if (msg.obj != null) {
                         byte[] resBytes = (byte[]) msg.obj;
                         resBytes[2] = (byte) 0x02;
                         resBytes[6] = currentEventId;
-                        bleBaseHelper. writeCharacteristic(bleDevice, resBytes, writeListener);
+                        bleBaseHelper.writeCharacteristic(esimDevice.getBleDevice(), resBytes, writeListener);
                     }
                     break;
                 case JSON_BODY_EACH_FRAME:
-                    CURRENT_ACTION = JSON_BODY_EACH_FRAME;
+                    esimData.setStepAction(JSON_BODY_EACH_FRAME);
+                    int currentFrame = esimData.getCurrentFrame();
+                    int totalFrame = esimData.getTotalFrame();
                     currentFrame++;
+                    esimData.setCurrentFrame(currentFrame);
                     if (currentFrame > totalFrame) return;
                     byte[] requestBytes = DataPacketUtils.sortEachFrame(jsonBodyBytes, currentFrame, totalFrame);
                     byte[] currentFrameBytes = DataPacketUtils.currentPacket(jsonBodyBytes, currentFrame, totalFrame);
                     byte[] dataLengts = DataPacketUtils.dataLenght(currentFrameBytes.length);
-                    headBytes[1] = dataLengts[1];
-                    headBytes[2] = dataLengts[2];
-                    headBytes[3] = (byte) totalFrame;
-                    headBytes[4] = (byte) currentFrame;
-                    headBytes[6] = currentEventId;
-                    bleBaseHelper.writeCharacteristic(bleDevice, headBytes, writeListener);
+                    byte[] headBytes = new byte[]{-85, dataLengts[1], dataLengts[2], (byte) totalFrame, (byte) currentFrame, currentEventId};
+                    esimData.setHeadBytes(headBytes);
+                    bleBaseHelper.writeCharacteristic(esimDevice.getBleDevice(), headBytes, writeListener);
                     if (currentFrame == totalFrame) {
-                        CURRENT_ACTION = 3;
-                        currentFrame = 0;
-                        totalFrame = 0;
+                        esimData.setStepAction(3);
+                        esimData.setCurrentFrame(0);
+                        esimData.setTotalFrame(0);
                     }
 //                    Log.e("dataL---", currentFrameBytes.length + "/" + requestBytes.length + "/" + Arrays.toString(headBytes));
-                    bleBaseHelper.writeCharacteristic(bleDevice, 20, requestBytes, writeListener);
+                    bleBaseHelper.writeCharacteristic(esimDevice.getBleDevice(), 20, requestBytes, writeListener);
                     break;
                 case PREPARE_URL_TRANSFORM: //写入设置url的指令
                     byte[] urlHeadByte = DataPacketUtils.frameHeadBytes(OrderSetUtils.ESIM_SM_DP, defualtUrl.getBytes(), 1, 1);
-                    bleBaseHelper.writeCharacteristic(bleDevice, urlHeadByte, writeListener);
+                    bleBaseHelper.writeCharacteristic(esimDevice.getBleDevice(), urlHeadByte, writeListener);
                     break;
                 case BEGIN_URL_TRANSFORM: //开始写入url
-                    CURRENT_ACTION = BEGIN_URL_TRANSFORM;
+                    esimData.setStepAction(BEGIN_URL_TRANSFORM);
                     byte[] urlByte = DataPacketUtils.splitEachFrameBytes(defualtUrl.getBytes());
-                    bleBaseHelper.writeCharacteristic(bleDevice, 20, urlByte, writeListener);
+                    bleBaseHelper.writeCharacteristic(esimDevice.getBleDevice(), 20, urlByte, writeListener);
                     break;
                 case BEGIN_ACTIVE:
-                    bleBaseHelper.writeCharacteristic(bleDevice, OrderSetUtils.ESIM_PROFILE_START, writeListener);
+                    bleBaseHelper.writeCharacteristic(esimDevice.getBleDevice(), OrderSetUtils.ESIM_PROFILE_START, writeListener);
                     break;
             }
         }
@@ -190,27 +179,26 @@ public abstract class ESimActiveHelper extends BaseHelper {
     private NotifyOpenCallback notifyListener = new NotifyOpenCallback() {
         @Override
         public void onNotifySuccess(BleDevice device) {
-
             Log.e("notifySuccess---", device + "");
-            if (device.getMac().equalsIgnoreCase(mMac)) {
+            if (device.getMac().equalsIgnoreCase(esimDevice.getMac())) {
                 notifyBesiness();
             }
         }
 
         @Override
         public void onNotifyFailed(BleException e) {
-            if (CURRENT_ACTION == ActionUtils.ACTION_ESIM_ACTIVE_FIRST) {
-                bleBaseHelper.setNotify(bleDevice, notifyListener);
+            if (esimData.getStepAction() == ActionUtils.ACTION_ESIM_ACTIVE_FIRST) {
+                bleBaseHelper.setNotify(esimDevice.getBleDevice(), notifyListener);
             }
         }
 
         @Override
         public void onCharacteristicChanged(String mac, byte[] data) {
             Log.e("dataCallback---", TransformUtils.bytesToHexString(data));
-            if (mac.equalsIgnoreCase(mMac)) {
-                if (CURRENT_ACTION == ActionUtils.ACTION_ESIM_ACTIVE_FIRST || CURRENT_ACTION == 3) {//获取url和postdata回复
+            if (mac.equalsIgnoreCase(esimDevice.getMac())) {
+                if (esimData.getStepAction() == ActionUtils.ACTION_ESIM_ACTIVE_FIRST || esimData.getStepAction() == 3) {//获取url和postdata回复
                     if (data.length == 7 || data.length == 9) {
-                        headBytes = data;
+                        esimData.setHeadBytes(data);
                         int length1 = TransformUtils.byte2Int(data[1]);
                         int length2 = TransformUtils.byte2Int(data[2]);
                         if (length1 != 0) {
@@ -222,31 +210,30 @@ public abstract class ESimActiveHelper extends BaseHelper {
                             byte eventId = data[6];
                             currentEventId = eventId;
                             if (eventId == (byte) 0x51 || eventId == (byte) 0x54 || eventId == (byte) 0x57 || eventId == (byte) 0x5A) {
-                                CURRENT_ACTION = 0;//请求url的回复指令
+                                esimData.setStepAction(0);
+                                ;//请求url的回复指令
                             } else if (eventId == (byte) 0x52 || eventId == (byte) 0x55 || eventId == (byte) 0x58 || eventId == (byte) 0x5B) {
-                                CURRENT_ACTION = 4; //请求POST的回复
+                                esimData.setStepAction(4); //请求POST的回复
                             }
                         }
-                        packets = tLength % 19 == 0 ? tLength / 19 : tLength / 19 + 1;
-                        handler.sendEmptyMessageDelayed(DATA_TIMEOUT, packets * 50 + 3000);//超时处理
+                        esimData.setPackets(tLength % 19 == 0 ? tLength / 19 : tLength / 19 + 1);
+                        handler.sendEmptyMessageDelayed(DATA_TIMEOUT, esimData.getPackets() * 50 + 3000);//超时处理
                     }
-                } else if (CURRENT_ACTION == 0 || CURRENT_ACTION == 4) {//处理url和postdata,即组包
-                    sumPackets++;
-                    sumPacketList.add((int) data[0]);
+                } else if (esimData.getStepAction() == 0 || esimData.getStepAction() == 4) {//处理url和postdata,即组包
+                    esimData.setPackets(esimData.getSumPackets());
                     data = Arrays.copyOfRange(data, 1, data.length);
-                    if (dataBytes == null) {
-                        dataBytes = data;
+                    if (esimData.getDataBytes() == null) {
+                        esimData.setDataBytes(data);
                     } else {
-                        dataBytes = TransformUtils.combineArrays(dataBytes, data);
+                        esimData.setDataBytes(TransformUtils.combineArrays(esimData.getDataBytes(), data));
                     }
-                    if (sumPackets == packets) { //未丢包
-                        handler.sendEmptyMessageDelayed(DATA_CHECK, packets * 50);
-                        sumPackets = 0;
-                        sumPacketList.clear();
+                    if (esimData.getSumPackets() == esimData.getPackets()) { //未丢包
+                        handler.sendEmptyMessageDelayed(DATA_CHECK, esimData.getPackets() * 50);
+                        esimData.setSumPackets(0);
                     }
-                } else if (CURRENT_ACTION == JSON_BODY_EACH_FRAME) {
+                } else if (esimData.getStepAction() == JSON_BODY_EACH_FRAME) {
                     handler.sendEmptyMessageDelayed(JSON_BODY_EACH_FRAME, 50);
-                } else if (CURRENT_ACTION == ActionUtils.ACTION_ESIM_ACTIVE_FORTH) {//下载profile结果
+                } else if (esimData.getStepAction() == ActionUtils.ACTION_ESIM_ACTIVE_FORTH) {//下载profile结果
                     if (data.length > 7) {
                         boolean moduleId = data[5] == (byte) 0x30;
                         boolean eventId = data[6] == (byte) 0x5D;
@@ -263,7 +250,7 @@ public abstract class ESimActiveHelper extends BaseHelper {
                             }
                         }
                     }
-                } else if (CURRENT_ACTION == ActionUtils.ACTION_ESIM_ACTIVE) {//激活结果
+                } else if (esimData.getStepAction() == ActionUtils.ACTION_ESIM_ACTIVE) {//激活结果
                     if (data.length > 7) {
                         boolean moduleId = data[5] == (byte) 0x30;
                         boolean eventId = data[6] == (byte) 0x08;
@@ -276,7 +263,7 @@ public abstract class ESimActiveHelper extends BaseHelper {
                             esimActiveState(code == 0);
                         }
                     }
-                } else if (CURRENT_ACTION == ActionUtils.ACTION_ESIM_UNACTIVE) {//去活结果
+                } else if (esimData.getStepAction() == ActionUtils.ACTION_ESIM_UNACTIVE) {//去活结果
 //                    esimActiveCallback.notifyCallback(data);
                     if (data.length > 7) {
                         boolean moduleId = data[5] == (byte) 0x30;
@@ -290,21 +277,21 @@ public abstract class ESimActiveHelper extends BaseHelper {
                             esimCancelState(code == 0);
                         }
                     }
-                } else if (CURRENT_ACTION == BEGIN_URL_TRANSFORM) {
+                } else if (esimData.getStepAction() == BEGIN_URL_TRANSFORM) {
                     if (data.length > 7) {
                         if (data[data.length - 1] == 0) { //设置成功回复
-                            if (esimEnum== ESimActiveHelper.EsimEnum.ESIM_ACTIVE) {
+                            if (esimEnum == EsimEnum.ESIM_ACTIVE) {
                                 esimActiveFirst();
-                            } else if (esimEnum == ESimActiveHelper.EsimEnum.ESIM_CANCEL) {
-                                CURRENT_ACTION = ActionUtils.ACTION_ESIM_UNACTIVE;
+                            } else if (esimEnum == EsimEnum.ESIM_CANCEL) {
+                                esimData.setStepAction(ActionUtils.ACTION_ESIM_UNACTIVE);
                                 esimCancel();
-                            } else if (esimEnum == ESimActiveHelper.EsimEnum.ESIM_DELETE) {
-                                CURRENT_ACTION = ActionUtils.ACTION_ESIM_PROFILE_DELETE;
+                            } else if (esimEnum == EsimEnum.ESIM_DELETE) {
+                                esimData.setStepAction(ActionUtils.ACTION_ESIM_PROFILE_DELETE);
                                 deleteProfile();
                             }
                         }
                     }
-                } else if (CURRENT_ACTION == ActionUtils.ACTION_ESIM_PROFILE_DELETE) {
+                } else if (esimData.getStepAction() == ActionUtils.ACTION_ESIM_PROFILE_DELETE) {
                     if (data.length > 7) {
                         boolean moduleId = data[5] == (byte) 0x30;
                         boolean eventId = data[6] == (byte) 0x0A;
@@ -325,39 +312,37 @@ public abstract class ESimActiveHelper extends BaseHelper {
 
         @Override
         public void onScanFinished(BleDevice bleDevice) {
+            Log.e("scanFinish---", bleDevice + "");
             if (bleDevice == null) {
-                printError("未扫描到设备");
                 deviceNotFound();
             }
         }
 
         @Override
         public void onConnectSuccess(BleDevice device, BluetoothGatt gatt, int status) {
-            printResult("设备连接成功");
+            Log.e("connSuccess---", device + "");
             if (device != null) {
-                bleDevice = device;
+                esimDevice.setBleDevice(device);
                 bleBaseHelper.setNotify(device, notifyListener);
             }
         }
 
         @Override
         public void onConnectFailed(BleDevice bleDevice, String description) {
-            printResult("设备连接失败");
+            Log.e("connFail---", description + "");
         }
 
         @Override
         public void onDisconnect(boolean isActiveDisConnected, BleDevice device, BluetoothGatt gatt) {
-            printError("设备断开连接");
             deviceDisconnects(isActiveDisConnected, device);
         }
     };
 
-    public ESimActiveHelper(Application application, String mac, String url) {
+    public ESimHelper(Application application, String mac, String url) {
         bleBaseHelper=new BleBaseHelper(application);
-        this.mMac = mac;
-        this.mUrl = url;
+        esimDevice.setMac(mac);
+        esimDevice.setUrl(url);
         init();
-
     }
 
     /**
@@ -365,8 +350,8 @@ public abstract class ESimActiveHelper extends BaseHelper {
      *
      * @param type 需要进行的操作 =ESIM_ACTIVE-激活,ESIM_CANCEL-去活,ESIM_DELETE-删除profile
      */
-    public final void start(ESimActiveHelper.EsimEnum type) {
-        if (TextUtils.isEmpty(mMac)) {
+    public final void start(EsimEnum type) {
+        if (TextUtils.isEmpty(esimDevice.getMac())) {
             macInvalidate();
             return;
         }
@@ -374,27 +359,24 @@ public abstract class ESimActiveHelper extends BaseHelper {
             phoneBleDisable();
             return;
         }
-        if (TextUtils.isEmpty(mUrl)) {
+        if (TextUtils.isEmpty(esimDevice.getUrl())) {
             urlInvalidate();
             return;
         }
-        esimEnum=type;
+        esimEnum = type;
 
         setSMDPUrl();
     }
 
     public final void stop() {
-        printLog("调用stop方法");
         releaseHandler();
-        if (bleDevice != null && bleBaseHelper.isConnected(mMac)) {
-            printResult("关闭notify");
-            bleBaseHelper.closeNotify(bleDevice);
+        if (esimDevice.getBleDevice() != null && bleBaseHelper.isConnected(esimDevice.getMac())) {
+            bleBaseHelper.closeNotify(esimDevice.getBleDevice());
         }
     }
 
     private void releaseHandler() {
         if (handler != null) {
-            printResult("释放handler");
             handler.removeCallbacksAndMessages(null);
             handler = null;
         }
@@ -409,17 +391,17 @@ public abstract class ESimActiveHelper extends BaseHelper {
 
 
     private void notifyBesiness() {
-        if (CURRENT_ACTION == ActionUtils.ACTION_ESIM_ACTIVE_FIRST) {
+        if (esimData.getStepAction() == ActionUtils.ACTION_ESIM_ACTIVE_FIRST) {
             currentEventId = (byte) 0x50;
             handler.sendEmptyMessageDelayed(BEGIN_ACTIVE, 10000);
-        } else if (CURRENT_ACTION == ActionUtils.ACTION_ESIM_ACTIVE) {
-            bleBaseHelper.writeCharacteristic(bleDevice, OrderSetUtils.ESIM_ACTIVE, writeListener);
-        } else if (CURRENT_ACTION == ActionUtils.ACTION_ESIM_UNACTIVE) {
-            bleBaseHelper.writeCharacteristic(bleDevice, OrderSetUtils.ESIM_CANCEL, writeListener);
-        } else if (CURRENT_ACTION == ActionUtils.ACTION_ESIM_URL) {
+        } else if (esimData.getStepAction() == ActionUtils.ACTION_ESIM_ACTIVE) {
+            bleBaseHelper.writeCharacteristic(esimDevice.getBleDevice(), OrderSetUtils.ESIM_ACTIVE, writeListener);
+        } else if (esimData.getStepAction() == ActionUtils.ACTION_ESIM_UNACTIVE) {
+            bleBaseHelper.writeCharacteristic(esimDevice.getBleDevice(), OrderSetUtils.ESIM_CANCEL, writeListener);
+        } else if (esimData.getStepAction() == ActionUtils.ACTION_ESIM_URL) {
             handler.sendEmptyMessageDelayed(PREPARE_URL_TRANSFORM, 20);
-        } else if (CURRENT_ACTION == ActionUtils.ACTION_ESIM_PROFILE_DELETE) {
-            bleBaseHelper.writeCharacteristic(bleDevice, OrderSetUtils.ESIM_PROFILE_DELETE, writeListener);
+        } else if (esimData.getStepAction() == ActionUtils.ACTION_ESIM_PROFILE_DELETE) {
+            bleBaseHelper.writeCharacteristic(esimDevice.getBleDevice(), OrderSetUtils.ESIM_PROFILE_DELETE, writeListener);
         }
     }
 
@@ -429,16 +411,16 @@ public abstract class ESimActiveHelper extends BaseHelper {
      * @param data 已经连接的情况下,和设备交互的数据
      */
     private void prepare(byte[] data) {
-        if (bleDevice == null) {
-            BleDevice device = bleBaseHelper.getConnectDevice(mMac);
+        if (esimDevice.getBleDevice() == null) {
+            BleDevice device = bleBaseHelper.getConnectDevice(esimDevice.getMac());
             if (device == null) {
-                bleBaseHelper.scanAndConnect(true, mMac, "", handleListener);
+                bleBaseHelper.scanAndConnect(true, esimDevice.getMac(), "", handleListener);
             } else {
-                this.bleDevice = device;
+                esimDevice.setBleDevice(device);
                 bleBaseHelper.setNotify(device, notifyListener);
             }
         } else {
-            bleBaseHelper.writeCharacteristic(bleDevice, data, writeListener);
+            bleBaseHelper.writeCharacteristic(esimDevice.getBleDevice(), data, writeListener);
         }
     }
 
@@ -448,7 +430,7 @@ public abstract class ESimActiveHelper extends BaseHelper {
 
 
     private void setSMDPUrl() {
-        CURRENT_ACTION = ActionUtils.ACTION_ESIM_URL;
+        esimData.setStepAction(ActionUtils.ACTION_ESIM_URL);
         byte[] urlHeadByte = DataPacketUtils.frameHeadBytes(OrderSetUtils.ESIM_SM_DP, defualtUrl.getBytes(), 1, 1);
         prepare(urlHeadByte);
     }
@@ -457,7 +439,7 @@ public abstract class ESimActiveHelper extends BaseHelper {
      *
      */
     private void esimActiveFirst() {
-        CURRENT_ACTION = ActionUtils.ACTION_ESIM_ACTIVE_FIRST;
+        esimData.setStepAction(ActionUtils.ACTION_ESIM_ACTIVE_FIRST);
         notifyBesiness();
     }
 
@@ -471,18 +453,19 @@ public abstract class ESimActiveHelper extends BaseHelper {
      * @param jsonBody   使用第一步和第二步的url请求得到的body
      */
     private void esimActiveNext(int statusCode, String jsonBody) {
-        CURRENT_ACTION = ActionUtils.ACTION_ESIM_ACTIVE_NEXT;
-        if (bleDevice == null) {
-            bleBaseHelper.scanAndConnect(true, mMac, "", handleListener);
+        esimData.setStepAction(ActionUtils.ACTION_ESIM_ACTIVE_NEXT);
+        if (esimDevice.getBleDevice() == null) {
+            bleBaseHelper.scanAndConnect(true, esimDevice.getMac(), "", handleListener);
             return;
         }
-        if (headBytes == null) return;
+        if (esimData.getHeadBytes() == null) return;
         currentEventId++;
         Log.e("dataLength---", jsonBody.length() + "/" + currentEventId);
         byte[] codeBytes = TransformUtils.int2TwoBytes(statusCode);
         byte[] jsonBytes = jsonBody.getBytes();
         jsonBodyBytes = TransformUtils.combineArrays(codeBytes, jsonBytes);
-        totalFrame = jsonBodyBytes.length % 4096 == 0 ? jsonBodyBytes.length / 4096 : jsonBodyBytes.length / 4096 + 1;
+        int totalFrame = jsonBodyBytes.length % 4096 == 0 ? jsonBodyBytes.length / 4096 : jsonBodyBytes.length / 4096 + 1;
+        esimData.setTotalFrame(totalFrame);
         handler.sendEmptyMessageDelayed(JSON_BODY_EACH_FRAME, 20);
 
     }
@@ -493,22 +476,22 @@ public abstract class ESimActiveHelper extends BaseHelper {
      * @param statusCode 服务器状态码
      */
     private void esimActiveResult(int statusCode) {
-        CURRENT_ACTION = ActionUtils.ACTION_ESIM_ACTIVE_FORTH;
+        esimData.setStepAction(ActionUtils.ACTION_ESIM_ACTIVE_FORTH);
         currentEventId++;
         byte[] resultOrderBytes = OrderSetUtils.ESIM_PROFILE_DOWNLOAD_POST_RESP;
         byte[] codeBytes = TransformUtils.int2TwoBytes(statusCode);
         byte[] resultBytes = TransformUtils.combineArrays(resultOrderBytes, codeBytes);
         resultBytes[2] = (byte) 0x02;
         resultBytes[6] = currentEventId;
-        bleBaseHelper.writeCharacteristic(bleDevice, resultBytes, writeListener);
+        bleBaseHelper.writeCharacteristic(esimDevice.getBleDevice(), resultBytes, writeListener);
     }
 
     /**
      * 激活,这一步才是最终的激活,前面四步都是为激活esim做准备
      */
     private void esimActive() {
-        CURRENT_ACTION = ActionUtils.ACTION_ESIM_ACTIVE;
-        bleBaseHelper.writeCharacteristic(bleDevice, OrderSetUtils.ESIM_ACTIVE, writeListener);
+        esimData.setStepAction(ActionUtils.ACTION_ESIM_ACTIVE);
+        bleBaseHelper.writeCharacteristic(esimDevice.getBleDevice(), OrderSetUtils.ESIM_ACTIVE, writeListener);
     }
 
     /**
@@ -546,33 +529,6 @@ public abstract class ESimActiveHelper extends BaseHelper {
 
             }
         });
-    }
-    /*********************打印log方法***********************/
-    /**
-     * 打印过程
-     *
-     * @param text 内容
-     */
-    private void printLog(String text) {
-        Logg.t(TAG).recordLog(getClass(), text, Logg.VERBOSE);
-    }
-
-    /**
-     * 打印结果
-     *
-     * @param text 内容
-     */
-    private void printResult(String text) {
-        Logg.t(TAG).recordLog(getClass(), text, Logg.INFO);
-    }
-
-    /**
-     * 打印错误
-     *
-     * @param text 内容
-     */
-    private void printError(String text) {
-        Logg.t(TAG).recordLog(getClass(), text, Logg.ERROR);
     }
 
     /**************暴露给外部的方法,主要处理各种状态等业务 start****************/

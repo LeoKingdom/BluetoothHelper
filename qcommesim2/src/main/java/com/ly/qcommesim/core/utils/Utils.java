@@ -8,15 +8,13 @@ import android.bluetooth.BluetoothDevice;
 import android.util.Log;
 
 import java.lang.reflect.Method;
-import java.util.regex.Pattern;
 
 /**
  * <p>This class contains all useful methods for this module.</p>
  */
 public class Utils {
 
-    public static long betweenTimes = 200;
-
+    public static long betweenTimes=200;
     //反射来调用BluetoothDevice.removeBond取消设备的配对
     public static void unpairDevice(BluetoothDevice device) {
         try {
@@ -26,11 +24,6 @@ public class Utils {
         } catch (Exception e) {
             Log.e("bondRemove--", e.getMessage());
         }
-    }
-
-    public static boolean isMacAddress(String mac) {
-        String patern = "^([A-Fa-f0-9]{2}[:]){5}[A-Fa-f0-9]{2}$";
-        return Pattern.matches(patern, mac);
     }
 
 }
