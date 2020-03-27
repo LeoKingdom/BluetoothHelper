@@ -49,10 +49,12 @@ dependencies {
 //    api(name: "xhelper_6_12", ext: 'aar')
 //    api(name: "ma_xutils", ext: 'aar')
     implementation 'com.squareup.retrofit2:retrofit:2.7.0'
-    implementation project(path: ':qcommesim')
+//    implementation project(path: ':qcommesim')
 //    implementation project(path: ':esimhelper')
 //    implementation project(path: ':qualcomm')
     api(name: "de_esim-v0.0.1", ext: 'aar')
 //    api(name: "blehelper", ext: 'aar')
     api(name: "fastble", ext: 'aar')
+    api(name: "xble", ext: 'aar')
+    implementation project(path: ':qcommesim3')
 }

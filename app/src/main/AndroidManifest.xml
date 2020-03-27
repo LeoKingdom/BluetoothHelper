@@ -26,8 +26,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".QcommUpgradeActivity1"/>
-        <service android:name="com.ly.qualcomm.service.QcommBleService"/>
+        <activity android:name=".QcommUpgradeActivity2"/>
+        <service android:name="com.ly.qcommesim.qcomm.service.QcommBleService"/>
 
     </application>
 

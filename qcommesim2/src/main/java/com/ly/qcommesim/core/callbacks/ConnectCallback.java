@@ -12,7 +12,7 @@ import com.fastble.fastble.exception.BleException;
  * date: 2019/11/26 17:48
  * version: 1.0
  */
-public abstract class ConnectCallback extends com.ly.qcommesim.core.callbacks.BaseBleCallback {
+public abstract class ConnectCallback extends BaseBleCallback {
     public abstract void onConnectSuccess(BleDevice device, BluetoothGatt gatt);
 
     public abstract void onConnectFail(BleDevice device, BleException e);

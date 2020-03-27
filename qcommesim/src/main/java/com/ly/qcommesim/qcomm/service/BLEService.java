@@ -21,6 +21,7 @@ import android.os.Handler;
 import android.util.ArrayMap;
 import android.util.Log;
 
+import com.ly.qcommesim.core.utils.PrintLog;
 import com.ly.qcommesim.qcomm.annotation.State;
 import com.ly.qcommesim.qcomm.ble.BLEUtils;
 import com.ly.qcommesim.qcomm.ble.Characteristics;
@@ -1521,6 +1522,7 @@ public abstract class BLEService extends Service {
             return false;
         }
         boolean done = mBluetoothGatt.setCharacteristicNotification(characteristic, enabled);
+        PrintLog.printResult(getClass(),"开启蓝牙通知: "+done);
         if (mShowDebugLogs) {
             Log.d(TAG, "Request set characteristic notification dispatched to system: " + done);
         }

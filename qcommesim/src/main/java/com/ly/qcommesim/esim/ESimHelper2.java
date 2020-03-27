@@ -8,22 +8,22 @@ import android.text.TextUtils;
 import com.de.esim.rohttp.Rohttp;
 import com.de.esim.rohttp.helper.callback.HttpCallback;
 import com.fastble.fastble.data.BleDevice;
-import com.ly.qcommesim.core.beans.OrderBean;
 import com.ly.qcommesim.core.callbacks.WriteCallback;
-import com.ly.qcommesim.core.helper.BaseBleHelper;
+import com.ly.qcommesim.core.helper.BaseHelper;
 import com.ly.qcommesim.core.helper.BleBaseHelper;
 import com.ly.qcommesim.core.utils.ActionUtils;
 import com.ly.qcommesim.core.utils.CRCCheckUtils;
 import com.ly.qcommesim.core.utils.DataPacketUtils;
 import com.ly.qcommesim.core.utils.OrderSetUtils;
 import com.ly.qcommesim.core.utils.TransformUtils;
-import com.ly.qcommesim.esim.bean.EsimData;
-import com.ly.qcommesim.esim.bean.EsimDevice;
-import com.ly.qcommesim.esim.enums.EsimEnum;
+import com.ly.qcommesim.core.utils.Utils;
+import com.ly.qcommesim.esim.beans.EsimData;
+import com.ly.qcommesim.esim.beans.EsimDevice;
+import com.ly.qcommesim.esim.beans.OrderBean;
 import com.xble.xble.core.cons.FunMode;
 import com.xble.xble.core.log.Logg;
 import com.xble.xble.core.utils.TimerHelper;
-
+import com.ly.qcommesim.esim.ESimHelper.EsimEnum;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -36,7 +36,7 @@ import java.util.List;
  * <p>
  * esim卡工具类,主要为外围设备和中心设备围绕esim展开的交互(蓝牙)
  */
-public abstract class ESimHelper {
+public abstract class ESimHelper2 {
     private static final String TAG = "ESimHelper";
     private final int DATA_TIMEOUT = 1000;
     private final int DATA_CHECK = 1001;//校验数据
@@ -54,7 +54,7 @@ public abstract class ESimHelper {
     private EsimEnum esimEnum;
     private BleBaseHelper bleBaseHelper;
     private String defualtUrl = "1$53d22361.cpolar.cn$04386-AGYFT-A74Y8-3F815";
-    private BaseBleHelper baseHelper;
+    private BaseHelper baseHelper;
     private List<Integer> loseNums = new ArrayList<>();//丢包的序号集合
     private int failCount = 3;
     private int transferCount = 0;
@@ -65,10 +65,10 @@ public abstract class ESimHelper {
     private byte[] postComms=new byte[]{(byte) 0x52,(byte) 0x55,(byte) 0x58,(byte) 0x5B};
 
     private void writeData(byte[] datas, boolean isOrder) {
-        bleBaseHelper.writeCharacteristic(esimDevice.getBleDevice(), 20, datas, new WriteCallback() {
+        bleBaseHelper.writeCharacteristic(esimDevice.getBleDevice(), Utils.betweenTimes, datas, new WriteCallback() {
             @Override
             public void writeSuccess(int actionType, int current, int total, byte[] justWrite) {
-                printLog(Arrays.toString(justWrite));
+                printLog("数据输入: "+Arrays.toString(justWrite));
                 reWriteCount = 0;
                 if (esimData.getStepAction() == ActionUtils.ACTION_ESIM_URL) {
                     printLog("设置url指令写入成功");
@@ -105,18 +105,26 @@ public abstract class ESimHelper {
         outTimeTimer = new TimerHelper() {
             @Override
             public void doSomething() {
-
+                //Todo 处理丢包逻辑,因为数据是被动接收的,所以用超时来处理
+                handleLost();
             }
         }.startDelay(delay);
     }
 
+    private void handleLost() {
+        //在一定时间(根据接收的包数来计算时间)内,如果接收的包数不等于总包数表示已丢包
+        if (esimData.getSumPackets()!=esimData.getPackets()){
 
-    public ESimHelper(Application application, String mac, String url) {
-        bleBaseHelper = new BleBaseHelper(application);
+        }
+    }
+
+
+    public ESimHelper2(Application application, String mac, String url) {
+        bleBaseHelper = new BleBaseHelper(application,mac);
         esimDevice = new EsimDevice();
         esimDevice.setMac(mac);
         esimDevice.setUrl(url);
-        baseHelper = new BaseBleHelper(application);
+        baseHelper = new BaseHelper(application,mac);
     }
 
     /**
@@ -124,7 +132,7 @@ public abstract class ESimHelper {
      *
      * @param type 需要进行的操作 =ESIM_ACTIVE-激活,ESIM_CANCEL-去活,ESIM_DELETE-删除profile
      */
-    public final void start(EsimEnum type) {
+    public final void start(ESimHelper.EsimEnum type) {
         if (TextUtils.isEmpty(esimDevice.getMac())) {
             macInvalidate();
             return;
@@ -153,7 +161,7 @@ public abstract class ESimHelper {
     private void notifyBesiness() {
         if (esimData.getStepAction() == ActionUtils.ACTION_ESIM_ACTIVE_FIRST) {
             currentEventId = (byte) 0x50;
-            handleMessage(BEGIN_ACTIVE, null);
+            handleMessage(BEGIN_ACTIVE, OrderSetUtils.ESIM_PROFILE_START);
         } else if (esimData.getStepAction() == ActionUtils.ACTION_ESIM_ACTIVE) {
             writeData(OrderSetUtils.ESIM_ACTIVE, true);
         } else if (esimData.getStepAction() == ActionUtils.ACTION_ESIM_UNACTIVE) {
@@ -171,7 +179,7 @@ public abstract class ESimHelper {
      * @param data 已经连接的情况下,和设备交互的数据
      */
     private void prepare(byte[] data) {
-        BleDevice device = baseHelper.getConnDevice(esimDevice.getMac());
+        BleDevice device = bleBaseHelper.getConnectDevice(esimDevice.getMac());
         if (device != null) {
             notifyChange();
             baseHelper.notifys(device, FunMode.ESIM);
@@ -232,11 +240,11 @@ public abstract class ESimHelper {
      * @param data tracker返回的数据
      */
     private void notifyDataChange(String mac, byte[] data) {
-        printLog("notify data back: " + Arrays.toString(data));
+        printLog("tracker 返回的数据: " + Arrays.toString(data));
         OrderBean orderBean = new OrderBean(data);
         switch (esimData.getStepAction()) {
             case 3:
-            case ActionUtils.ACTION_ESIM_ACTIVE_FIRST:
+            case ActionUtils.ACTION_ESIM_ACTIVE_FIRST: //帧头包
                 if (data.length == 7 || data.length == 9) {
                     esimData.setOrderBean(orderBean);
                     esimData.setHeadBytes(data);
@@ -245,19 +253,22 @@ public abstract class ESimHelper {
                 }
                 break;
             case 0:
-            case 4:
+            case 4: //3. 激活第三步,接收url和post数据包
                 int sp = esimData.getSumPackets();
                 sp++;
                 esimData.setSumPackets(sp);
                 //将原数据的第一个字节存入集合,序号
                 loseNums.add(TransformUtils.byte2Int(data[0]));
+                //截取url和post数据包(第一个字节为序号)
                 data = Arrays.copyOfRange(data, 1, data.length);
+                //组包开始
                 byte[] dataBytes = esimData.getDataBytes();
                 if (dataBytes == null) {
                     dataBytes = data;
                 } else {
                     dataBytes = TransformUtils.combineArrays(esimData.getDataBytes(), data);
                 }
+                //组包结束
                 esimData.setDataBytes(dataBytes);
                 if (esimData.getSumPackets() == esimData.getPackets()) { //未丢包
                     handleMessage(DATA_CHECK, esimData.getDataBytes());
@@ -329,7 +340,7 @@ public abstract class ESimHelper {
 
                 }
                 break;
-            case DATA_CHECK: //数据校验
+            case DATA_CHECK: //4.激活第四步 数据校验
                 if (bytes == null) return;
                 byte crcByte = bytes[bytes.length - 1];//最后一个字节为crc校验,tracker返回
                 //每一帧的有效字节数据
@@ -339,6 +350,7 @@ public abstract class ESimHelper {
                 //将字节数组转换成string
                 String data = TransformUtils.bytes2String(dataByte);
                 //重置每一帧数据
+
                 esimData.setDataBytes(null);
                 printLog("数据校验,app crc: " + crcByte1 + "tracker crc: " + crcByte);
                 if (crcByte == crcByte1) { //app计算出的crc和tracker返回的crc相等,则表示数据正确
@@ -416,12 +428,17 @@ public abstract class ESimHelper {
                 byte[] urlByte = DataPacketUtils.splitEachFrameBytes(defualtUrl.getBytes());
                 writeData(urlByte, false);
                 break;
-            case BEGIN_ACTIVE:
-                writeData(OrderSetUtils.ESIM_PROFILE_START, true);
+            case BEGIN_ACTIVE://1. 激活第一步,发送profile下载指令,无回复,直接返回接收第一次url指令
+                writeData(bytes, true);
                 break;
         }
     }
 
+    /**
+     * 2. 激活第二步
+     * 此方法为解析 计算url和post回复指令(即反向帧头),主要获取url和post的字节长度
+     *
+     */
     private void calcPackets() {
         OrderBean order = esimData.getOrderBean();
         int tt = 0;
@@ -455,7 +472,7 @@ public abstract class ESimHelper {
     }
 
     /**
-     *
+     *激活第一步,发送下载profile指令
      */
     private void esimActiveFirst() {
         esimData.setStepAction(ActionUtils.ACTION_ESIM_ACTIVE_FIRST);

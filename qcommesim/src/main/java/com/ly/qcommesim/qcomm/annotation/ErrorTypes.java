@@ -25,30 +25,31 @@ import java.lang.annotation.RetentionPolicy;
 public @interface ErrorTypes {
 
     /**
-     * <p>This error occurs when there is an attempt to start the upgrade but the board is not ready to process.</p>
+     * 尝试启动升级但未准备好处理主板时，会发生此错误。
      */
     int ERROR_BOARD_NOT_READY = 1;
     /**
-     * <p>This error occurs when a received VMU packet from the board does not match the expected data: too much
-     * information, not enough, etc.</p>
+     *
+     * 当从板上收到的VMU数据包与预期数据不匹配时，就会发生此错误：信息过多，信息不足等。
      */
     int WRONG_DATA_PARAMETER = 2;
     /**
-     * <p>This error occurs when the board notifies that an error or a warning occurs internally during its upgrade
-     * process.</p>
+     *
+     * 当主板在升级过程中通知内部发生错误或警告时，就会发生此错误。
      */
     int RECEIVED_ERROR_FROM_BOARD = 3;
     /**
-     * <p>This error is reported when a {@link com.ly.bluetoothhelper.oat.upgrade.packet.VMUException VMUException} occurs during the process.</p>
+     *其他异常情况
      */
     int EXCEPTION = 4;
     /**
-     * <p>This error occurs when there is an attempt to start the upgrade but the VMUManager is already processing an upgrade
-     * .</p>
+     *
+     * 尝试启动升级但VMUManager已经在处理升级时，将发生此错误。
      */
     int AN_UPGRADE_IS_ALREADY_PROCESSING = 5;
     /**
-     * <p>This error occurs when the file to upload is empty or does not exist.</p>
+     *
+     * 当要上传的文件为空或不存在时，会发生此错误。
      */
     int NO_FILE = 6;
 }

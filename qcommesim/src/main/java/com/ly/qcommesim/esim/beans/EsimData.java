@@ -1,6 +1,4 @@
-package com.ly.qcommesim.esim.bean;
-
-import com.ly.qcommesim.core.beans.OrderBean;
+package com.ly.qcommesim.esim.beans;
 
 import java.util.Arrays;
 

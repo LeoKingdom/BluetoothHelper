@@ -14,29 +14,24 @@ import android.text.TextUtils;
 
 import com.fastble.fastble.BleManager;
 import com.fastble.fastble.callback.BleGattCallback;
-import com.fastble.fastble.callback.BleIndicateCallback;
-import com.fastble.fastble.callback.BleMtuChangedCallback;
 import com.fastble.fastble.callback.BleNotifyCallback;
-import com.fastble.fastble.callback.BleReadCallback;
 import com.fastble.fastble.callback.BleRssiCallback;
 import com.fastble.fastble.callback.BleScanAndConnectCallback;
-import com.fastble.fastble.callback.BleScanCallback;
 import com.fastble.fastble.callback.BleWriteCallback;
 import com.fastble.fastble.data.BleDevice;
 import com.fastble.fastble.exception.BleException;
 import com.fastble.fastble.scan.BleScanRuleConfig;
 import com.fastble.fastble.utils.BleLog;
 import com.ly.qcommesim.core.callbacks.ConnectCallback;
-import com.ly.qcommesim.core.callbacks.MTUCallback;
 import com.ly.qcommesim.core.callbacks.NotifyOpenCallback;
 import com.ly.qcommesim.core.callbacks.OpenListener;
-import com.ly.qcommesim.core.callbacks.ReadCallback;
-import com.ly.qcommesim.core.callbacks.ReadRssiCallback;
-import com.ly.qcommesim.core.callbacks.ScanCallback;
 import com.ly.qcommesim.core.callbacks.ScanConnectCallback;
 import com.ly.qcommesim.core.callbacks.WriteCallback;
 import com.ly.qcommesim.core.utils.Utils;
+import com.xble.xble.core.FastCore;
+import com.xble.xble.core.log.Logg;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -50,149 +45,88 @@ import java.util.Set;
  * 蓝牙辅助基类
  */
 public class BleBaseHelper {
-    public static final String BLE_SCAN_START = "ble.scan.start";
-    public static final String BLE_SCAN_FINISH = "ble.scan.finish";
-    public static final String BLE_CONNECT_SUCCESS = "ble.conn.success";
-    public static final String BLE_RECONNECT_SUCCESS = "ble.reconn.success";
-    public static final String BLE_CONNECT_FAIL = "ble.conn.fail";
-    public static final String BLE_DISCONNECT = "ble.disconnect";
-    public static final String BLE_NOT_FOUND = "ble.not.found";
-    public static final int BLE_SCAN_START_I = 0x1001;
-    public static final int BLE_SCAN_FINISH_I = 0x1002;
-    public static final int BLE_CONNECT_SUCCESS_I = 0x1003;
-    public static final int BLE_CONNECT_FAIL_I = 0x1004;
-    public static final int BLE_DISCONNECT_I = 0x1005;
-    public static final int BLE_NOT_FOUND_I = 0x1006;
-    public static final int BLE_RECONNECT_SUCCESS_I = 0x1007;
-    public static final int START_TIMER = 0;
+    private static final String TAG = "BleBaseHelper";
+    private static boolean ENABLE_LOG = true;// 是否记录日志
+    private static int RE_CONNECT_COUNT = 1;// 重连次数
+    private static int RE_CONNECT_INTERVAL = 5 * 1000;// 间隔时间
+    private static int CONNECT_OVERTIME = 10 * 1000;// 连接超时
+    private static int INTERVAL_PKG_TIME = 20;// 每个包间隔20毫秒
+    private static int SCAN_TIMEOUT = 10 * 1000;// 操作超时
     private BleManager bleManager;
     private long scanTimeout = 10000;
     private String service_uuid;
-    private String read_uuid;
     private String write_uuid;
     private String notify_uuid;
-    private String indicate_uuid;
 
     public BleBaseHelper(Application application) {
         bleManager = BleManager.getInstance();
         bleManager.init(application);
-        init();
+        init(application);
+        initUuid();
+    }
+
+    private void initUuid() {
+        printLogOne("----uuid 赋值");
+        String[] uuids = {"00005500-d102-11e1-9b23-00025b00a5a5", "00005501-d102-11e1-9b23-00025b00a5a5"};
+        service_uuid=uuids[0];
+        notify_uuid=uuids[1];
+        write_uuid=uuids[2];
     }
 
     /**
-     * 初始化方法,主要为初始化一些必要的属性,如uuid
+     * 初始化方法,主要为初始化一些主要的属性
      */
-    public  void init(){}
+    public void init(Application app) {
+        printLogOne("----- 触发初始化");
+        // 1.初始化fastble蓝牙引擎
+        BleManager.getInstance().init(app);
+        printLogOne("1.启动蓝牙");
 
-    /**
-     * 是否打印日志
-     *
-     * @param open
-     * @return
-     */
-    public BleBaseHelper openLog(boolean open) {
-        bleManager.enableLog(open);
-        return this;
+        // 2.判断当前系统是否支持蓝牙
+        if (BleManager.getInstance().isSupportBle()) {
+            printLogOne("2.当前系统支持蓝牙");
+
+            // 3.提示用户打开蓝牙
+            if (!BleManager.getInstance().isBlueEnable()) {
+                // 未使用, 某些版本不支持打开蓝牙框, 改用业务自己根据需求实现
+                // BleManager.getInstance().enableBluetooth();
+                printLogOne("3.检测到扫描时未打开蓝牙");
+            } else {
+                printLogOne("3.蓝牙功能已生效");
+            }
+
+
+            // 4.初始化蓝牙基本配置1
+            BleManager.getInstance()// manager
+                    .enableLog(ENABLE_LOG)// 打印log
+                    .setReConnectCount(RE_CONNECT_COUNT, RE_CONNECT_INTERVAL)// 重连次数, 间隔时间
+                    .setSplitWriteNum(FastCore.SPLIT_WRITER_NUM)// 默认每次传输字节20KB
+                    .setConnectOverTime(CONNECT_OVERTIME)// 连接数
+                    .setOperateTimeout(FastCore.OPERATE_TIMEOUT);// 操作超时
+            BleManager.getInstance().setIntervalBetweenPacket(INTERVAL_PKG_TIME);// 每个包间隔20毫秒
+
+            printLogOne("4.配置基本信息完毕");
+            printLogOne("4.[重连次数]: " + RE_CONNECT_COUNT // t1
+                    + "; [间隔时间]: " + RE_CONNECT_INTERVAL // t2
+                    + "; [默认传输最大字节]: " + FastCore.SPLIT_WRITER_NUM // t3
+                    + "; [连接数]: " + CONNECT_OVERTIME // t4
+                    + "; [操作超时]: " + FastCore.OPERATE_TIMEOUT // t5
+
+            );
+
+            // 5.初始化扫描规则
+            BleScanRuleConfig.Builder builder = new BleScanRuleConfig.Builder();
+            BleScanRuleConfig config = builder.setScanTimeOut(SCAN_TIMEOUT).setAutoConnect(true).build();
+            BleManager.getInstance().initScanRule(config);
+            printLogOne("5.配置扫描规则完毕");
+            printLogOne("5.[扫描超时]: " + SCAN_TIMEOUT + "; [断联后自动重连]: " + true);
+
+        } else {
+            /* 2.系统不支持蓝牙 */
+            systemBleNotSupportNext();
+        }
     }
 
-    /**
-     * 设置重连次数,默认5次
-     *
-     * @param count
-     * @return
-     */
-    public BleBaseHelper setReconnCount(int count) {
-        bleManager.setReConnectCount(count);
-        return this;
-    }
-
-    /**
-     * 连接超时时间,默认10s
-     *
-     * @param time
-     * @return
-     */
-    public BleBaseHelper setConnectOverTime(long time) {
-        bleManager.setConnectOverTime(time);
-        return this;
-    }
-
-    /**
-     * 其他操作超时时间,默认5s
-     *
-     * @param timeout
-     * @return
-     */
-    public BleBaseHelper setTimeout(int timeout) {
-        bleManager.setOperateTimeout(timeout);
-        return this;
-    }
-
-    /**
-     * 扫描超时,默认10s,通常设置值不超过20s,因为扫描太耗内存
-     *
-     * @param timeout
-     * @return
-     */
-    public BleBaseHelper setScanTimeout(long timeout) {
-        this.scanTimeout = timeout;
-        return this;
-    }
-
-    /**
-     * 服务uuid
-     *
-     * @param service_uuid
-     * @return
-     */
-    public BleBaseHelper setService_UUID(String service_uuid) {
-        this.service_uuid = service_uuid;
-        return this;
-    }
-
-    /**
-     * 读特征uuid
-     *
-     * @param read_uuid
-     * @return
-     */
-    public BleBaseHelper setRead_UUID(String read_uuid) {
-        this.read_uuid = read_uuid;
-        return this;
-    }
-
-    /**
-     * 写特征uuid
-     *
-     * @param write_uuid
-     * @return
-     */
-    public BleBaseHelper setWrite_UUID(String write_uuid) {
-        this.write_uuid = write_uuid;
-        return this;
-    }
-
-    /**
-     * 通知uuid
-     *
-     * @param notify_uuid
-     * @return
-     */
-    public BleBaseHelper setNotify_UUID(String notify_uuid) {
-        this.notify_uuid = notify_uuid;
-        return this;
-    }
-
-    /**
-     * 通知uuid,区别于notify的是:indicate开启的通知从设备会回复一个确认包给主设备,notify则不会
-     *
-     * @param indicate_uuid
-     * @return
-     */
-    public BleBaseHelper setIndicate_UUID(String indicate_uuid) {
-        this.indicate_uuid = indicate_uuid;
-        return this;
-    }
 
     /**
      * 判断是否打开蓝牙
@@ -202,18 +136,21 @@ public class BleBaseHelper {
     public boolean isBleOpen() {
         return BleManager.getInstance().isBlueEnable();
     }
+
     /**
      * 打开蓝牙
      */
     public void enableBle() {
         BleManager.getInstance().enableBluetooth();
     }
+
     /**
      * 关闭蓝牙
      */
     public void closeBle() {
         BleManager.getInstance().disableBluetooth();
     }
+
     /**
      * 打开蓝牙,监听返回
      *
@@ -240,6 +177,7 @@ public class BleBaseHelper {
         }
         return false;
     }
+
     /**
      * 提醒用户去设置页打开gps,监听返回
      *
@@ -265,13 +203,14 @@ public class BleBaseHelper {
 
     /**
      * 根据蓝牙地址判断设备是否已配对(绑定)
+     *
      * @param mac 蓝牙地址
      * @return
      */
-    public boolean isBonded(String mac){
+    public boolean isBonded(String mac) {
         Set<BluetoothDevice> bondList = bleManager.getBondDeviceList();
-        for (BluetoothDevice bluetoothDevice:bondList){
-            if (bluetoothDevice.getAddress().equalsIgnoreCase(mac)){
+        for (BluetoothDevice bluetoothDevice : bondList) {
+            if (bluetoothDevice.getAddress().equalsIgnoreCase(mac)) {
                 return true;
             }
         }
@@ -280,54 +219,31 @@ public class BleBaseHelper {
 
     /**
      * 取消配对
+     *
      * @param mac 蓝牙地址
      */
-    public void unBondDevice(String mac){
+    public void unBondDevice(String mac) {
         Set<BluetoothDevice> bondList = bleManager.getBondDeviceList();
-        for (BluetoothDevice bluetoothDevice:bondList){
-            if (bluetoothDevice.getAddress().equalsIgnoreCase(mac)){
+        for (BluetoothDevice bluetoothDevice : bondList) {
+            if (bluetoothDevice.getAddress().equalsIgnoreCase(mac)) {
                 Utils.unpairDevice(bluetoothDevice);
             }
         }
     }
 
-    /**
-     * 扫描蓝牙设备
-     */
-    public void scan(final ScanCallback scanListener) {
-        if (!isBleOpen()) {
-            scanListener.onBleDisable();
-        }
-        bleManager.scan(new BleScanCallback() {
-            @Override
-            public void onScanFinished(List<BleDevice> scanResultList) {
-                if (scanListener != null) {
-                    scanListener.onScanFinished(scanResultList);
-                }
-            }
-
-            @Override
-            public void onScanStarted(boolean success) {
-                if (scanListener != null) {
-                    scanListener.onScanStart();
-                }
-            }
-
-            @Override
-            public void onScanning(BleDevice bleDevice) {
-                if (scanListener != null) {
-                    scanListener.onScanning(bleDevice);
-                }
-            }
-        });
-    }
 
     /**
      * 连接设备
+     * 知道mac地址可以直接连接,扫描目的就是在未知mac情况下发现设备
      *
      * @param mac 蓝牙mac地址
      */
     public void connect(String mac, final ConnectCallback connectCallback) {
+        if (!isBleOpen()) {
+            printError("蓝牙未打开...");
+            return;
+        }
+
         BleScanRuleConfig config = new BleScanRuleConfig.Builder().setAutoConnect(true).build();
         bleManager.initScanRule(config);
         bleManager.connect(mac, new BleGattCallback() {
@@ -337,7 +253,7 @@ public class BleBaseHelper {
              */
             @Override
             public void onStartConnect() {
-
+                printLog(mac + "-开始连接");
             }
 
             /**
@@ -347,6 +263,7 @@ public class BleBaseHelper {
              */
             @Override
             public void onConnectFail(BleDevice bleDevice, BleException exception) {
+                printResult(mac + "连接失败");
                 if (!isBleOpen()) {
                     connectCallback.onBleDisable();
                 } else if (connectCallback != null) {
@@ -362,6 +279,7 @@ public class BleBaseHelper {
              */
             @Override
             public void onConnectSuccess(BleDevice bleDevice, BluetoothGatt gatt, int status) {
+                printResult(mac + "连接成功");
                 if (connectCallback != null) {
                     connectCallback.onConnectSuccess(bleDevice, gatt);
                 }
@@ -376,14 +294,13 @@ public class BleBaseHelper {
              */
             @Override
             public void onDisConnected(boolean isActiveDisConnected, BleDevice device, BluetoothGatt gatt, int status) {
-                if (!isBleOpen()) {
-                    connectCallback.onBleDisable();
-                } else if (connectCallback != null) {
-                    connectCallback.onDisconnect(isActiveDisConnected, device);
-                }
+                printResult(device.getMac() + "断开连接,是否主动-" + isActiveDisConnected);
+                connectCallback.onDisconnect(isActiveDisConnected, device);
+
             }
         });
     }
+
     /**
      * 扫描并连接匹配的蓝牙设备
      *
@@ -394,8 +311,11 @@ public class BleBaseHelper {
 
     public void scanAndConnect(boolean isFuzzy, String address, String name, final ScanConnectCallback connectCallback) {
         if (!isBleOpen()) {
+            printError("蓝牙未打开...");
             connectCallback.onBleDisable();
+            return;
         }
+
         bleManager.initScanRule(scanRule(isFuzzy, address, name, true));
         bleManager.scanAndConnect(new BleScanAndConnectCallback() {
 
@@ -405,6 +325,7 @@ public class BleBaseHelper {
              */
             @Override
             public void onScanFinished(BleDevice bleDevice) {
+                printResult("2-扫描结束,扫到的设备-" + (bleDevice != null ? bleDevice.getMac() : "Null"));
                 if (connectCallback != null) {
                     connectCallback.onScanFinished(bleDevice);
                 }
@@ -415,7 +336,7 @@ public class BleBaseHelper {
              */
             @Override
             public void onStartConnect() {
-
+                printLog("3-开始连接" + address);
             }
 
             /**
@@ -425,6 +346,7 @@ public class BleBaseHelper {
              */
             @Override
             public void onConnectFail(BleDevice bleDevice, BleException exception) {
+                printResult("4-连接失败" + bleDevice.getMac());
                 if (!isBleOpen()) {
                     connectCallback.onBleDisable();
                 } else if (connectCallback != null) {
@@ -440,9 +362,11 @@ public class BleBaseHelper {
              */
             @Override
             public void onConnectSuccess(BleDevice bleDevice, BluetoothGatt gatt, int status) {
+                printResult("4-连接成功" + bleDevice.getMac());
                 if (connectCallback != null) {
                     connectCallback.onConnectSuccess(bleDevice, gatt, status);
                 }
+                printLog("当前设备的蓝牙信号强度为: " + bleDevice.getRssi());
 
             }
 
@@ -455,6 +379,7 @@ public class BleBaseHelper {
              */
             @Override
             public void onDisConnected(boolean isActiveDisConnected, BleDevice device, BluetoothGatt gatt, int status) {
+                printResult(device.getMac() + "断开连接,是否主动-" + isActiveDisConnected);
                 if (!isBleOpen()) {
                     connectCallback.onBleDisable();
                 } else if (connectCallback != null) {
@@ -469,6 +394,7 @@ public class BleBaseHelper {
              */
             @Override
             public void onScanStarted(boolean success) {
+                printLog("1-开始扫描,设备mac地址为-" + address);
                 if (connectCallback != null) {
                     connectCallback.onScanStarted(success);
                 }
@@ -480,6 +406,7 @@ public class BleBaseHelper {
              */
             @Override
             public void onScanning(BleDevice bleDevice) {
+                printLog("扫描中,设备hash-" + bleDevice.hashCode());
                 if (bleDevice != null) {
                     BleLog.e("found device===" + bleDevice.getMac() + "/" + bleDevice.getName());
                 }
@@ -488,49 +415,24 @@ public class BleBaseHelper {
         });
     }
 
-    /**
-     * 设置最大传输单元,必须是主从两端支持才会生效
-     * @param ob
-     * @param mtu
-     * @param mtuCallback
-     */
-    protected void setMTU(Object ob, int mtu, final MTUCallback mtuCallback) {
-        BleDevice device = getDevice(ob);
-        if (device == null) {
-            mtuCallback.deviceNotConnect();
-            return;
-        }
-        bleManager.setMtu(device, mtu, new BleMtuChangedCallback() {
-            @Override
-            public void onSetMTUFailure(BleException exception) {
-                if (mtuCallback != null) {
-                    mtuCallback.setFail(exception.getDescription());
-                }
-            }
 
-            @Override
-            public void onMtuChanged(int mtu) {
-                if (mtuCallback != null) {
-                    mtuCallback.setSuccess(mtu);
-                }
-            }
-        });
-    }
     /**
      * 扫描取消
      */
     protected void cancelScan() {
         BleManager.getInstance().cancelScan();
     }
+
     /**
      * 手动断开设备连接
      *
      * @param ob 可以是mac地址或者ble设备
      */
-    protected void disconnect(Object ob) {
+    public void disconnect(Object ob) {
         BleDevice device = getDevice(ob);
         bleManager.disconnect(device);
     }
+
     /**
      * 查看已连接的所有设备
      *
@@ -554,6 +456,7 @@ public class BleBaseHelper {
         }
         return null;
     }
+
     /**
      * 连接已绑定的设备
      * 但有时候会出现连接不上的情况,即使设备在连接范围内
@@ -572,6 +475,7 @@ public class BleBaseHelper {
             }
         }
     }
+
     /**
      * 查看设备是否连接
      *
@@ -583,59 +487,24 @@ public class BleBaseHelper {
     }
 
     /**
-     * 读取信号强度的回调
-     *
-     * @param ob
-     * @param readRssiCallback
-     */
-    protected void readRssi(Object ob, final ReadRssiCallback readRssiCallback) {
-        BleDevice device = getDevice(ob);
-        if (device == null) {
-            readRssiCallback.deviceNotConnect();
-            return;
-        }
-
-        BleManager.getInstance().readRssi(
-                device,
-                new BleRssiCallback() {
-
-                    @Override
-                    public void onRssiFailure(BleException exception) {
-                        // 读取设备的信号强度失败
-                        readRssiCallback.onRssiFailure(exception);
-                    }
-
-                    @Override
-                    public void onRssiSuccess(int rssi) {//对应了onReadRemoteRssi的回调
-                        // 读取设备的信号强度成功
-                        readRssiCallback.onRemoteRssi(rssi);
-                    }
-                });
-    }
-    /**
-     * 通过rssi来算出距离
-     *
-     * @param rssi 设备的rssi值
-     * @return 返回距离
-     */
-    public double getDistance(int rssi) {
-        int iRssi = Math.abs(rssi);
-        double power = (iRssi - 72) / (10 * 2.0);
-        return Math.pow(10, power);
-    }
-    /**
      * 设置通知
      *
      * @param ob 设备or蓝牙地址
-     *            notify 和indicate方法都可以设置通知,区别在于:indicate方法,从端收到通知会回发一个ACK包到主端
+     *           notify 和indicate方法都可以设置通知,区别在于:indicate方法,从端收到通知会回发一个ACK包到主端
      */
     public void setNotify(Object ob, final NotifyOpenCallback notifyOpenCallback) {
+        if (!isBleOpen()) {
+            printError("蓝牙未打开...");
+            return;
+        }
+        printLog("开启蓝牙通知...");
         final BleDevice device = getDevice(ob);
         if (device == null) {
             notifyOpenCallback.deviceNotConnect();
             return;
         }
         if (TextUtils.isEmpty(notify_uuid) || TextUtils.isEmpty(service_uuid)) {
+            printError("uuid不能为空,notify uuid:" + notify_uuid + " , service uuid:" + service_uuid);
             notifyOpenCallback.uuidInvalid();
             return;
         }
@@ -643,6 +512,7 @@ public class BleBaseHelper {
             // 打开通知操作成功
             @Override
             public void onNotifySuccess() {//对应了onDescriptorWrite的回调
+                printResult("设备蓝牙通知开启成功-" + device.getMac());
                 if (notifyOpenCallback != null) {
                     notifyOpenCallback.onNotifySuccess(device);
                 }
@@ -651,6 +521,7 @@ public class BleBaseHelper {
             // 打开通知操作失败
             @Override
             public void onNotifyFailure(BleException exception) {
+                printResult("设备蓝牙通知开启失败-" + device.getMac() + ",失败原因:" + exception.getDescription());
                 if (notifyOpenCallback != null) {
                     notifyOpenCallback.onNotifyFailed(exception);
                 }
@@ -659,6 +530,7 @@ public class BleBaseHelper {
             // 打开通知后，设备发过来的数据将在这里出现
             @Override
             public void onCharacteristicChanged(String mac, byte[] data) {//对应了onCharacteristicChanged的回调
+                printLog("设备" + mac + "通知返回的数据: " + Arrays.toString(data));
                 if (notifyOpenCallback != null) {
                     notifyOpenCallback.onCharacteristicChanged(mac, data);
                 }
@@ -666,108 +538,34 @@ public class BleBaseHelper {
         });
     }
 
-    public void closeNotify(BleDevice device){
-        BleManager.getInstance().stopNotify(device,service_uuid,notify_uuid);
+    public void closeNotify(BleDevice device) {
+        BleManager.getInstance().stopNotify(device, service_uuid, notify_uuid);
     }
-
-    /**
-     * 设置通知
-     *
-     * @param ob 设备or蓝牙地址
-     *            notify 和indicate方法都可以设置通知,区别在于:indicate方法,从端收到通知会回发一个ACK包到主端
-     */
-    protected void setIndicate(Object ob, final NotifyOpenCallback notifyOpenCallback) {
-        final BleDevice device = getDevice(ob);
-        if (device == null) {
-            notifyOpenCallback.deviceNotConnect();
-            return;
-        }
-        if (TextUtils.isEmpty(indicate_uuid) || TextUtils.isEmpty(service_uuid)) {
-            notifyOpenCallback.uuidInvalid();
-            return;
-        }
-        BleManager.getInstance().indicate(device, service_uuid, indicate_uuid, false, new BleIndicateCallback() {
-            // 打开通知操作成功
-            @Override
-            public void onIndicateSuccess() {//对应了onDescriptorWrite的回调
-                if (notifyOpenCallback != null) {
-                    notifyOpenCallback.onNotifySuccess(device);
-                }
-            }
-
-            // 打开通知操作失败
-            @Override
-            public void onIndicateFailure(BleException exception) {
-                if (notifyOpenCallback != null) {
-                    notifyOpenCallback.onNotifyFailed(exception);
-                }
-            }
-
-            // 打开通知后，设备发过来的数据将在这里出现
-            @Override
-            public void onCharacteristicChanged(String mac, byte[] data) {//对应了onCharacteristicChanged的回调
-                if (notifyOpenCallback != null) {
-                    notifyOpenCallback.onCharacteristicChanged(mac, data);
-                }
-            }
-        });
-    }
-    /**
-     * 读方法
-     * 读取设备特征
-     *
-     * @param ob
-     * @param readCallback
-     */
-    protected void readCharacteristic(Object ob, final ReadCallback readCallback) {
-        BleDevice device = getDevice(ob);
-        if (device == null) {
-            readCallback.deviceNotConnect();
-            return;
-        }
-        if (TextUtils.isEmpty(service_uuid) || TextUtils.isEmpty(read_uuid)) {
-            readCallback.uuidInvalid();
-            return;
-        }
-        BleManager.getInstance().read(
-                device,
-                service_uuid,
-                read_uuid,
-                new BleReadCallback() {
-                    @Override
-                    public void onReadSuccess(byte[] data) {//对应了onCharacteristicRead的回调
-                        if (readCallback != null) {
-                            readCallback.onReadSuccess(data);
-                        }
-                    }
-
-                    @Override
-                    public void onReadFailure(BleException exception) {
-                        if (readCallback != null) {
-                            readCallback.onReadFailure(exception);
-                        }
-                    }
-                });
-    }
-
 
     /**
      * 写数据的回调,默认大于20字节时，会分割数据，大于20字节直接是默认写完一次后回调了onCharacteristicWrite后，就继续发下一个数据了。
      *
-     * @param ob           蓝牙设备or地址
+     * @param ob            蓝牙设备or地址
      * @param datas         传输的字节数据
      * @param writeCallback 监听回调
      */
     public void writeCharacteristic(Object ob, byte[] datas, final WriteCallback writeCallback) {
+        if (!isBleOpen()) {
+            printError("蓝牙未打开...");
+            return;
+        }
         BleDevice device = getDevice(ob);
         if (device == null) {
             writeCallback.deviceNotConnect();
             return;
         }
         if (TextUtils.isEmpty(service_uuid) || TextUtils.isEmpty(write_uuid)) {
+            printError("uuid不能为空,write uuid:" + notify_uuid + " , service uuid:" + service_uuid);
             writeCallback.uuidInvalid();
             return;
         }
+
+        printLog(device.getMac() + "开始写入数据...");
         BleManager.getInstance().write(
                 device,
                 service_uuid,
@@ -776,12 +574,14 @@ public class BleBaseHelper {
                 new BleWriteCallback() {
                     @Override
                     public void onWriteSuccess(int current, int total, byte[] justWrite) {//对应了onCharacteristicWrite的回调
+                        printResult(device.getMac() + "数据写入成功,写入数据为: " + Arrays.toString(justWrite));
                         writeCallback.writeSuccess(0, current, total, justWrite);
                     }
 
                     @Override
                     public void onWriteFailure(BleException exception) {
                         // 发送数据到设备失败
+                        printResult(device.getMac() + "数据写入失败,原因: " + exception.getDescription());
                         writeCallback.error(exception.getDescription());
                     }
                 });
@@ -790,21 +590,27 @@ public class BleBaseHelper {
     /**
      * 写数据的回调,默认大于20字节时，会分割数据，大于20字节直接是默认写完一次后回调了onCharacteristicWrite后，就继续发下一个数据了。
      *
-     * @param ob                 蓝牙设备or地址
+     * @param ob                  蓝牙设备or地址
      * @param intervalBetweenTime 两包之间间隔时间  ms
      * @param dates               传输的字节数据
      * @param writeCallback       监听回调
      */
     public void writeCharacteristic(Object ob, long intervalBetweenTime, byte[] dates, final WriteCallback writeCallback) {
+        if (!isBleOpen()) {
+            printError("蓝牙未打开...");
+            return;
+        }
         BleDevice device = getDevice(ob);
         if (device == null) {
             writeCallback.deviceNotConnect();
             return;
         }
         if (TextUtils.isEmpty(service_uuid) || TextUtils.isEmpty(write_uuid)) {
+            printError("uuid不能为空,write uuid:" + notify_uuid + " , service uuid:" + service_uuid);
             writeCallback.uuidInvalid();
             return;
         }
+        printLog(device.getMac() + "开始写入数据...");
         BleManager.getInstance().write(
                 device,
                 service_uuid,
@@ -814,12 +620,14 @@ public class BleBaseHelper {
                 new BleWriteCallback() {
                     @Override
                     public void onWriteSuccess(int current, int total, byte[] justWrite) {//对应了onCharacteristicWrite的回调
+                        printResult(device.getMac() + "数据写入成功,写入数据为: " + Arrays.toString(justWrite));
                         writeCallback.writeSuccess(0, current, total, justWrite);
                     }
 
                     @Override
                     public void onWriteFailure(BleException exception) {
                         // 发送数据到设备失败
+                        printResult(device.getMac() + "数据写入失败,原因: " + exception.getDescription());
                         writeCallback.error(exception.getDescription());
                     }
                 });
@@ -828,20 +636,26 @@ public class BleBaseHelper {
     /**
      * 写数据的回调,默认大于20字节时，会分割数据，大于20字节直接是默认写完一次后回调了onCharacteristicWrite后，就继续发下一个数据了。
      *
-     * @param ob           蓝牙地址or设备
+     * @param ob            蓝牙地址or设备
      * @param dates         传输的字节数据
      * @param writeCallback 监听回调
      */
     public void writeCharacteristic(Object ob, byte[] dates, boolean nextPacketSuccess, long betweenPacketInterval, final WriteCallback writeCallback) {
+        if (!isBleOpen()) {
+            printError("蓝牙未打开...");
+            return;
+        }
         BleDevice device = getDevice(ob);
         if (device == null) {
             writeCallback.deviceNotConnect();
             return;
         }
         if (TextUtils.isEmpty(service_uuid) || TextUtils.isEmpty(write_uuid)) {
+            printError("uuid不能为空,write uuid:" + notify_uuid + " , service uuid:" + service_uuid);
             writeCallback.uuidInvalid();
             return;
         }
+        printLog(device.getMac() + "开始写入数据...");
         BleManager.getInstance().setIntervalBetweenPacket(betweenPacketInterval);
         BleManager.getInstance().setWhenNextPacketSuccess(nextPacketSuccess);
         BleManager.getInstance().write(
@@ -852,15 +666,36 @@ public class BleBaseHelper {
                 new BleWriteCallback() {
                     @Override
                     public void onWriteSuccess(int current, int total, byte[] justWrite) {//对应了onCharacteristicWrite的回调
+                        printResult(device.getMac() + "数据写入成功,写入数据为: " + Arrays.toString(justWrite));
                         writeCallback.writeSuccess(0, current, total, justWrite);
                     }
 
                     @Override
                     public void onWriteFailure(BleException exception) {
                         // 发送数据到设备失败
+                        printResult(device.getMac() + "数据写入失败,原因: " + exception.getDescription());
                         writeCallback.error(exception.getDescription());
                     }
                 });
+    }
+
+
+    public void getRssi(BleDevice device){
+        if (device==null){
+            printError("获取rssi,device = null");
+            return;
+        }
+        BleManager.getInstance().readRssi(device, new BleRssiCallback() {
+            @Override
+            public void onRssiFailure(BleException e) {
+                printResult("获取rssi失败: "+e.getDescription());
+            }
+
+            @Override
+            public void onRssiSuccess(int i) {
+                rssiSuccess(i);
+            }
+        });
     }
 
 
@@ -885,14 +720,91 @@ public class BleBaseHelper {
     }
 
 
-    private BleDevice getDevice(Object ob){
-        BleDevice device=null;
-        if (ob instanceof String){
-            device=getConnectDevice(ob.toString());
-        }else if (ob instanceof BleDevice){
-            device=(BleDevice)ob;
+    private BleDevice getDevice(Object ob) {
+        BleDevice device = null;
+        if (ob instanceof String) {
+            device = getConnectDevice(ob.toString());
+        } else if (ob instanceof BleDevice) {
+            device = (BleDevice) ob;
         }
         return device;
+    }
+
+
+    /*********************打印log方法***********************/
+
+    /**
+     * 打印过程 (只打印1次)
+     *
+     * @param text 内容
+     */
+    private void printLogOne(String text) {
+        if (!Logg.isPrintOne) {
+            Logg.t(TAG).recordLog(getClass(), text, Logg.VERBOSE);
+            Logg.isPrintOne = true;
+        }
+
+    }
+
+    /**
+     * 打印过程
+     *
+     * @param text 内容
+     */
+    private void printLog(String text) {
+        Logg.t(TAG).recordLog(getClass(), text, Logg.VERBOSE);
+    }
+
+    /**
+     * 打印结果
+     *
+     * @param text 内容
+     */
+    private void printResult(String text) {
+        Logg.t(TAG).recordLog(getClass(), text, Logg.INFO);
+    }
+
+    /**
+     * 打印错误
+     *
+     * @param text 内容
+     */
+    private void printError(String text) {
+        Logg.t(TAG).recordLog(getClass(), text, Logg.ERROR);
+    }
+
+    // 系统不支持
+    private BleNotSupportListener bleNotSupportListener;
+
+    // Inteerface--> 接口OnSystemNotSupportListener
+    public interface BleNotSupportListener {
+        void systemBleSupport();
+    }
+
+    // 对外方式setOnSystemNotSupportListener
+    public void setBleNotSupportListener(BleNotSupportListener bleNotSupportListener) {
+        this.bleNotSupportListener = bleNotSupportListener;
+    }
+
+    // 封装方法systemNotSupportNext
+    private void systemBleNotSupportNext() {
+        if (bleNotSupportListener != null) {
+            bleNotSupportListener.systemBleSupport();
+        }
+    }
+
+    private BleRssiSuccessListener rssiSuccessListener;
+    public interface BleRssiSuccessListener{
+        void rssiSuccess(int rssi);
+    }
+
+    public void setRssiSuccessListener(BleRssiSuccessListener rssiSuccessListener){
+        this.rssiSuccessListener=rssiSuccessListener;
+    }
+    private void rssiSuccess(int rssi){
+        if (rssiSuccessListener!=null){
+            rssiSuccessListener.rssiSuccess(rssi);
+        }
     }
 
 }

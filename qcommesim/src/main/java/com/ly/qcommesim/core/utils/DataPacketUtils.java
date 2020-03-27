@@ -222,7 +222,7 @@ public class DataPacketUtils {
         byte[] lengthByte = new byte[3];
         int l = dataLenght / 256;
         int m = dataLenght % 256;
-        lengthByte[0] = TransformUtils.hexToByte("AB");
+        lengthByte[0] = TransformUtils.hexToByte("FD");
         lengthByte[1] = TransformUtils.int2byte(l);
         lengthByte[2] = TransformUtils.int2byte(m);
         return lengthByte;
@@ -255,7 +255,7 @@ public class DataPacketUtils {
         byte[] frameOrderByte = new byte[7];
         int l = dataLength / 256;
         int m = dataLength % 256;
-        frameOrderByte[0] = TransformUtils.hexToByte("AB");
+        frameOrderByte[0] = TransformUtils.hexToByte("FD");
         frameOrderByte[1] = TransformUtils.int2byte(l);
         frameOrderByte[2] = TransformUtils.int2byte(m);
         frameOrderByte[3] = TransformUtils.int2byte(totalFrame);
@@ -272,7 +272,7 @@ public class DataPacketUtils {
      * @return
      */
     public static byte[] eachFrameBytes(byte[] data) {
-        byte[] headBytes = new byte[]{-85, 0, (byte) data.length, 0, 0, (byte) 0x20, (byte) 0x03};
+        byte[] headBytes = new byte[]{(byte)0xFD, 0, (byte) data.length, 0, 0, (byte) 0x20, (byte) 0x03};
         return TransformUtils.combineArrays(headBytes, data);
     }
 

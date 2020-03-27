@@ -87,12 +87,6 @@ public abstract class QualcommHelper extends BleBaseHelper {
         });
     }
 
-    @Override
-    public final void init() {
-        //蓝牙芯片升级不需要此uuid
-    }
-
-
     /**
      * 绑定高通升级服务
      */
