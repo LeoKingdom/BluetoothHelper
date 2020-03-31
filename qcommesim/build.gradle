@@ -41,5 +41,5 @@ dependencies {
     implementation 'androidx.annotation:annotation:1.0.2'
     api(name: "fastble", ext: 'aar')
     api(name: "xble", ext: 'aar')
-    api(name: "de_esim-v0.0.5", ext: 'aar')
+    api(name: "de_esim-v0.0.6", ext: 'aar')
 }
