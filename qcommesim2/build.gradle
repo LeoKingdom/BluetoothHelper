@@ -41,5 +41,5 @@ dependencies {
     api 'com.alibaba:fastjson:1.2.58'
     api(name: "xble", ext: 'aar')
     api(name: "fastble", ext: 'aar')
-    api(name: "de_esim-v0.0.1", ext: 'aar')
+    api(name: "de_esim-v0.0.3", ext: 'aar')
 }

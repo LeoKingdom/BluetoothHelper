@@ -26,7 +26,8 @@ public class Main extends Activity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
-        initHttp(getApplication());
+        //初始化
+        Rohttp.initTrustAll(getApplication());
     }
 
     public void toEsim(View view){
@@ -38,23 +39,6 @@ public class Main extends Activity {
     }
     public void toGTUpgrade(View view){
         startActivity(new Intent(this, QcommUpgradeActivity2.class));
-    }
-
-    /**
-     * 初始化网络协议
-     */
-    private void initHttp(Application application){
-        //初始化Application
-        Rohttp.init(application);
-        //定义全局请求头
-        HashMap<String, String> headerMap = new HashMap<>();
-        headerMap.put("Content-Type", "application/json");
-        //设置请求头
-        Rohttp.HEADER = headerMap;
-        //发送https请求时信任所有证书
-        Rohttp.SSL_SOCKET_FACTORY = TrustAllCerts.createSSLSocketFactory();
-        //发送https请求时信任所有域名
-        Rohttp.HOSTNAME_VERRIFY = new TrustAllCerts.TrustAllHostnameVerifier();
     }
 
     private static final String mUrl = "https://2f72b92a.cpolar.cn/gsma/rsp2/es9plus/initiateAuthentication";
