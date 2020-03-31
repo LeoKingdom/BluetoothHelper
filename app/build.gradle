@@ -52,7 +52,7 @@ dependencies {
 //    implementation project(path: ':qcommesim')
 //    implementation project(path: ':esimhelper')
 //    implementation project(path: ':qualcomm')
-    api(name: "de_esim-v0.0.3", ext: 'aar')
+    api(name: "de_esim-v0.0.5", ext: 'aar')
 //    api(name: "blehelper", ext: 'aar')
     api(name: "fastble", ext: 'aar')
     api(name: "xble", ext: 'aar')
