@@ -1,4 +1,4 @@
-package com.ly.qcommesim.core.widget;
+package com.ly.createaar.wedgit;
 
 import android.content.Context;
 import android.util.AttributeSet;
@@ -9,7 +9,7 @@ import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
-import com.ly.qcommesim.R;
+import com.ly.createaar.R;
 import com.ly.qcommesim.core.utils.ViewVisibleUtils;
 
 

@@ -8,6 +8,8 @@ import android.bluetooth.BluetoothDevice;
 import android.util.Log;
 
 import java.lang.reflect.Method;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * <p>This class contains all useful methods for this module.</p>
@@ -24,6 +26,21 @@ public class Utils {
         } catch (Exception e) {
             Log.e("bondRemove--", e.getMessage());
         }
+    }
+
+    /**
+     * 去除特殊制表符
+     * @param str
+     * @return
+     */
+    public static String replaceBlank(String str) {
+        String dest = "";
+        if (str!=null) {
+            Pattern p = Pattern.compile("\\s*|\t|\r|\n");
+            Matcher m = p.matcher(str);
+            dest = m.replaceAll("");
+        }
+        return dest;
     }
 
 }

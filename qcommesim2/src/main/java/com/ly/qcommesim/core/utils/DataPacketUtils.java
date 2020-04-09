@@ -1,7 +1,6 @@
 package com.ly.qcommesim.core.utils;
 
 import android.content.Context;
-import android.util.Log;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,9 +20,9 @@ public class DataPacketUtils {
      * @return 当前帧字节数组
      */
 
-    private static final int CURR_MAX_MTU = 20; //当前支持最大传输字节
+    public static final int CURR_MAX_MTU = 20; //当前支持最大传输字节
     private static final int CURR_MAX_BYTE = 19; //每包字节数
-    private static final int CURR_MAX_FRAME = 4096; //每帧字节数
+    public static final int CURR_MAX_FRAME = 4096; //每帧字节数
     private static final int CURR_MAX_FRAME_PACKETS = 216; //每帧每包数
 
     public static byte[] currentPacket(byte[] datas, int curr, int total) {
@@ -102,123 +101,6 @@ public class DataPacketUtils {
         return bytes1;
     }
 
-    /**
-     * @param inputStream 文件输入流
-     * @return 加上校验字节后的字节数组
-     */
-    public static byte[] crcCombineBytes(InputStream inputStream) {
-        //合并后的字节数组
-        byte[] lastBytes = null;
-        try {
-            byte[] bytes = TransformUtils.streamToByte(inputStream);
-            //由于需要带上序号,因此总的byte数组长度增大
-            int totalPackets0 = (bytes.length % CURR_MAX_BYTE == 0) ? (bytes.length / CURR_MAX_BYTE) : (bytes.length / CURR_MAX_BYTE + 1);
-            byte[] crcBytes = null;
-            int num = 0;
-            int currentPacket = 0;
-            if (bytes.length > CURR_MAX_FRAME) {
-                for (int j = 0; j < totalPackets0; j++) {
-                    num++;
-                    byte[] eachHeadBytes = new byte[]{(byte) (Integer.parseInt(Integer.toHexString(num), 16))};
-                    if (num == CURR_MAX_FRAME_PACKETS) {
-                        num = 0;
-                    }
-                    int tem = 0;
-                    if (j != totalPackets0 - 1) {
-                        tem = CURR_MAX_BYTE;
-                    } else {
-                        tem = bytes.length - CURR_MAX_BYTE * (totalPackets0 - 1);
-                    }
-                    byte[] eachBytes = TransformUtils.subBytes(bytes, j * CURR_MAX_BYTE, tem);
-                    byte[] handleBytes = TransformUtils.combineArrays(eachHeadBytes, eachBytes);
-                    if (j != 0) {
-                        lastBytes = TransformUtils.combineArrays(lastBytes, handleBytes);
-                    } else {
-                        lastBytes = TransformUtils.combineArrays(handleBytes);
-                    }
-                }
-            } else {
-                for (int j = 0; j < totalPackets0; j++) {
-                    byte[] eachHeadBytes = new byte[]{(byte) (Integer.parseInt(Integer.toHexString(j + 1), 16))};
-                    int tem = 0;
-                    if (j != totalPackets0 - 1) {
-                        tem = CURR_MAX_BYTE;
-                    } else {
-                        tem = bytes.length - CURR_MAX_BYTE * (totalPackets0 - 1);
-                    }
-                    byte[] eachBytes = TransformUtils.subBytes(bytes, j * CURR_MAX_BYTE, tem);
-                    byte[] handleBytes = TransformUtils.combineArrays(eachHeadBytes, eachBytes);
-                    if (j != 0) {
-                        lastBytes = TransformUtils.combineArrays(lastBytes, handleBytes);
-                    } else {
-                        lastBytes = TransformUtils.combineArrays(handleBytes);
-                    }
-                }
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        return lastBytes;
-    }
-
-    /**
-     * @param inputStream 文件输入流
-     * @return 加上序号后的字节数组
-     */
-    public static byte[] combinePacket(InputStream inputStream) {
-        //合并后的字节数组
-        byte[] lastBytes = null;
-        try {
-            byte[] bytes = TransformUtils.streamToByte(inputStream);
-            //由于需要带上序号,因此总的byte数组长度增大
-            int totalPackets0 = (bytes.length % CURR_MAX_BYTE == 0) ? (bytes.length / CURR_MAX_BYTE) : (bytes.length / CURR_MAX_BYTE + 1);
-            int num = 0;
-            if (bytes.length > CURR_MAX_FRAME) {
-                for (int j = 0; j < totalPackets0; j++) {
-                    num++;
-                    byte[] eachHeadBytes = new byte[]{(byte) (Integer.parseInt(Integer.toHexString(num), 16))};
-                    if (num == CURR_MAX_FRAME_PACKETS) {
-                        num = 0;
-                    }
-                    int tem = 0;
-                    if (j != totalPackets0 - 1) {
-                        tem = CURR_MAX_BYTE;
-                    } else {
-                        tem = bytes.length - CURR_MAX_BYTE * (totalPackets0 - 1);
-                    }
-                    byte[] eachBytes = TransformUtils.subBytes(bytes, j * CURR_MAX_BYTE, tem);
-                    byte[] handleBytes = TransformUtils.combineArrays(eachHeadBytes, eachBytes);
-                    if (j != 0) {
-                        lastBytes = TransformUtils.combineArrays(lastBytes, handleBytes);
-                    } else {
-                        lastBytes = TransformUtils.combineArrays(handleBytes);
-                    }
-                }
-            } else {
-                for (int j = 0; j < totalPackets0; j++) {
-                    byte[] eachHeadBytes = new byte[]{(byte) (Integer.parseInt(Integer.toHexString(j + 1), 16))};
-                    int tem = 0;
-                    if (j != totalPackets0 - 1) {
-                        tem = CURR_MAX_BYTE;
-                    } else {
-                        tem = bytes.length - 19 * (totalPackets0 - 1);
-                    }
-                    byte[] eachBytes = TransformUtils.subBytes(bytes, j * CURR_MAX_BYTE, tem);
-                    byte[] handleBytes = TransformUtils.combineArrays(eachHeadBytes, eachBytes);
-                    if (j != 0) {
-                        lastBytes = TransformUtils.combineArrays(lastBytes, handleBytes);
-                    } else {
-                        lastBytes = TransformUtils.combineArrays(handleBytes);
-                    }
-                }
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        return lastBytes;
-    }
 
     public static byte[] dataLenght(int dataLenght) {
         byte[] lengthByte = new byte[3];
@@ -244,39 +126,6 @@ public class DataPacketUtils {
         return frameByte;
     }
 
-    /**
-     * 数据帧帧头
-     *
-     * @param dataLength 字节长度
-     * @param totalFrame 总帧数
-     * @param currFrame  当前帧
-     * @return
-     */
-    public static byte[] eachFrameFirstPacket(int dataLength, int totalFrame, int currFrame) {
-        Log.e("dataLength---", dataLength + "");
-        byte[] frameOrderByte = new byte[7];
-        int l = dataLength / 256;
-        int m = dataLength % 256;
-        frameOrderByte[0] = TransformUtils.hexToByte("FD");
-        frameOrderByte[1] = TransformUtils.int2byte(l);
-        frameOrderByte[2] = TransformUtils.int2byte(m);
-        frameOrderByte[3] = TransformUtils.int2byte(totalFrame);
-        frameOrderByte[4] = TransformUtils.int2byte(currFrame);
-        frameOrderByte[5] = TransformUtils.hexToByte("20");
-        frameOrderByte[6] = TransformUtils.hexToByte("03");
-        return frameOrderByte;
-    }
-
-    /**
-     * 文件字节数少于13,不需要分包,直接在帧头末尾拼接即可
-     *
-     * @param data
-     * @return
-     */
-    public static byte[] eachFrameBytes(byte[] data) {
-        byte[] headBytes = new byte[]{-3, 0, (byte) data.length, 0, 0, (byte) 0x20, (byte) 0x03};
-        return TransformUtils.combineArrays(headBytes, data);
-    }
 
     //0xAB 0x00 0x04 0x03  0x01  0x20 0x03  0x03  0x01 0x0A 0x64 收包回复
     //帧头 数据-长度 总帧 当前帧 MId  EId  丢包数 之后为丢包序号(上限五包,超过填0xFF)

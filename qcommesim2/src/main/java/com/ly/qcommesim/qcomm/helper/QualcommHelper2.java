@@ -7,18 +7,15 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.text.TextUtils;
 import android.util.Log;
 
-import com.fastble.fastble.BleManager;
-import com.fastble.fastble.callback.BleReadCallback;
 import com.fastble.fastble.data.BleDevice;
-import com.fastble.fastble.exception.BleException;
 import com.ly.qcommesim.core.helper.BaseBleHelper;
-import com.ly.qcommesim.core.utils.TransformUtils;
 import com.ly.qcommesim.qcomm.annotation.ConfirmationType;
 import com.ly.qcommesim.qcomm.annotation.Enums;
 import com.ly.qcommesim.qcomm.annotation.MessageType;
@@ -27,14 +24,17 @@ import com.ly.qcommesim.qcomm.annotation.Support;
 import com.ly.qcommesim.qcomm.service.QcommBleService;
 import com.ly.qcommesim.qcomm.upgrade.UpgradeError;
 import com.ly.qcommesim.qcomm.upgrade.UploadProgress;
+import com.xble.xble.core.CoreManager;
 import com.xble.xble.core.cons.RssiLevel;
 import com.xble.xble.core.log.Logg;
 import com.xble.xble.core.utils.TimerHelper;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 
-public abstract class QualcommHelper2 extends BaseBleHelper {
+public abstract class QualcommHelper2 {
     private static final String TAG = "QualcommHelper2";
     private Activity mContext;
     private String macAddress;
@@ -49,20 +49,23 @@ public abstract class QualcommHelper2 extends BaseBleHelper {
     private boolean isOne = true;
     private boolean reStart = false;
     private boolean reSend = false;
+    private BaseBleHelper baseBleHelper;
+    private String upgradeFilePath;
 
     /**
      * 初始化必要参数
      *
      * @param context  上下文
      * @param mac      mac蓝牙地址
-     * @param filePath 升级文件路径
+     * @param filePath 升级文件路径,需要体现出版本的信息,否则无法判断是否需要升级
      * @return
      */
     public QualcommHelper2(Application application, Activity context, String mac, String filePath) {
-        super(application);
         this.mContext = context;
         this.macAddress = mac;
         this.mUpgradeFile = new File(filePath);
+        this.upgradeFilePath = filePath;
+        baseBleHelper = new BaseBleHelper(application);
     }
 
     /**
@@ -71,17 +74,17 @@ public abstract class QualcommHelper2 extends BaseBleHelper {
      * 可做版本校验
      */
     private void readCha() {
-        BleManager.getInstance().read(device, "0000180A-0000-1000-8000-00805F9B34FB", "00002A28-0000-1000-8000-00805F9B34FB", new BleReadCallback() {
-            @Override
-            public void onReadSuccess(byte[] bytes) {
-                Log.e("read---", TransformUtils.bytes2String(bytes));
-            }
-
-            @Override
-            public void onReadFailure(BleException e) {
-
-            }
+        baseBleHelper.setReadFailListener(error -> {
+            printResult("读取蓝牙版本失败,原因: " + error);
         });
+        baseBleHelper.setReadSuccessListener((version -> {
+            if (upgradeFilePath.contains(version)) {
+                printResult("当前版本不需要升级");
+            } else {
+
+            }
+        }));
+        baseBleHelper.read(device);
     }
 
     private void openTimer() {
@@ -93,7 +96,7 @@ public abstract class QualcommHelper2 extends BaseBleHelper {
             public void doSomething() {
                 if (reconnTimes > 0) {
                     reconnTimes--;
-                    doConnect();
+                    doHandle();
                 } else {
                     deviceNotFound();
                     connTimer.stop();
@@ -119,31 +122,31 @@ public abstract class QualcommHelper2 extends BaseBleHelper {
     }
 
     private void getRssi(BleDevice device) {
-        getRssi(device, new int[]{-40, -60, -75, -92});
-        setOnGetRssiFailedListener((exception -> {
+        baseBleHelper.getRssi(device, new int[]{-40, -60, -75, -92});
+        baseBleHelper.setOnGetRssiFailedListener((exception -> {
             printResult(device.getMac() + " 获取rssi失败,原因: " + exception.getDescription());
             this.rssiLevel = RssiLevel.UNKNOWN;
         }));
-        setOnGetRssiSuccessListener((rssi, rssiLevel) -> {
+        baseBleHelper.setOnGetRssiSuccessListener((rssi, rssiLevel) -> {
             this.rssiLevel = rssiLevel;
         });
     }
 
     private void doConnect() {
-        setOnStartConneectListener(() -> {
+        baseBleHelper.setOnStartConneectListener(() -> {
         });
-        setOnConnectFailedListener((bleDevice -> {
+        baseBleHelper.setOnConnectFailedListener((bleDevice -> {
             openTimer();
         }));
-        setOnConnectSuccessListener((bleDevice, bluetoothGatt) -> {
+        baseBleHelper.setOnConnectSuccessListener((bleDevice, bluetoothGatt) -> {
             rssiTimer(bleDevice);
-            connTimerStop();
+            //            connTimerStop();
             device = bleDevice;
             bindQcommService();
         });
-        setOnDisConnectedListener((isActive, bbleDevice, gatt) -> {
+        baseBleHelper.setOnDisConnectedListener((isActive, bbleDevice, gatt) -> {
             device = null;
-            qcommBleService.disconnectDevice();
+            //            qcommBleService.disconnectDevice();
             connTimerStop();
             rssiTimerStop();
             //            if (!isActive) {//不是主动断开
@@ -157,7 +160,7 @@ public abstract class QualcommHelper2 extends BaseBleHelper {
             //                }
             //            }
         });
-        connect(macAddress);
+        baseBleHelper.connect(macAddress);
     }
 
 
@@ -186,15 +189,15 @@ public abstract class QualcommHelper2 extends BaseBleHelper {
             macInvalidate();
             return;
         }
-        if (!isBLEEnable()) {
-            enableBle(mContext, 1001);
-            //            phoneBleDisable();
+        if (!baseBleHelper.isBLEEnable()) {
+            baseBleHelper.enableBle(mContext, 1001);
+            bleIsUnable();
             return;
         }
 
-        BleDevice tDevice = isTargetBLEExist(macAddress.toUpperCase());
+        BleDevice tDevice = baseBleHelper.isTargetBLEExist(macAddress.toUpperCase());
         if (tDevice == null || device == null) {
-            doConnect();
+            doHandle();
             return;
         }
 
@@ -206,6 +209,44 @@ public abstract class QualcommHelper2 extends BaseBleHelper {
 
     }
 
+
+    /**
+     * 是否为特殊机型:是则先扫描再连接,否则直接连接
+     */
+    private void doHandle() {
+        if (CoreManager.specialModel.contains(Build.MODEL)) {
+            scanDevice();
+        } else {
+            doConnect();
+        }
+    }
+
+    /**
+     * 扫描设备
+     */
+    private void scanDevice() {
+        List<String> macs = new ArrayList<>();
+        macs.add(macAddress);
+        baseBleHelper.setOnScanFinishListener(this::scanFinish);
+        baseBleHelper.scan(macs);
+    }
+
+    /**
+     * 扫描结束
+     *
+     * @param devices
+     */
+    private void scanFinish(List<BleDevice> devices) {
+        if (devices == null || devices.size() == 0) {//没找到设备
+            deviceNotFound();
+        } else {
+            doConnect();
+        }
+    }
+
+    /**
+     * qualcomm service连接设备
+     */
     private void onNext() {
         qcommBleService.connectToDevice(device.getDevice());
         addHandler();
@@ -224,7 +265,7 @@ public abstract class QualcommHelper2 extends BaseBleHelper {
             unBindService(mContext);
         }
         if (device != null) {
-            disConnectBLE(device);
+            baseBleHelper.disConnectBLE(device);
         }
         releaseHandler();
         rssiTimerStop();
@@ -273,6 +314,9 @@ public abstract class QualcommHelper2 extends BaseBleHelper {
         }
     };
 
+    /**
+     * 接收QcommBleService回来的handler消息
+     */
     @SuppressLint("HandlerLeak")
     private Handler mHandler = new Handler() {
         @Override
@@ -294,8 +338,8 @@ public abstract class QualcommHelper2 extends BaseBleHelper {
                             mHandler.sendEmptyMessageDelayed(10001, 3000);
                             //                            //第一次发送升级指令很大几率没有反应,再重发一次
                             mHandler.sendEmptyMessageDelayed(10003, 30000);
-                            //获取固件版本
                         }
+                        //获取固件版本
                         readCha();
                     } else if (stateLabel.equalsIgnoreCase("DISCONNECTED")) {
 
@@ -425,7 +469,7 @@ public abstract class QualcommHelper2 extends BaseBleHelper {
     public abstract void macInvalidate(); //mac地址非法时调用,必须处理,
 
     //手机蓝牙开关未打开时调用,必须处理,tracker蓝牙未打开的状态可以根据property的bluetooth_on属性来判断
-    public abstract void phoneBleDisable();
+    public abstract void bleIsUnable();
 
     public abstract void deviceNotFound(); //没有发现设备,必须处理,否则无法交互
 

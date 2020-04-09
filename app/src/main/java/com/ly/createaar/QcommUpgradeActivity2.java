@@ -14,12 +14,10 @@ import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.FragmentActivity;
 
 import com.fastble.fastble.data.BleDevice;
-import com.ly.qcommesim.core.widget.LoadingWidget;
-import com.ly.qcommesim.core.widget.ProgressDialogWidget;
-import com.ly.qcommesim.qcomm.annotation.Enums;
+import com.ly.createaar.wedgit.LoadingWidget;
+import com.ly.createaar.wedgit.ProgressDialogWidget;
 import com.ly.qcommesim.qcomm.helper.QualcommHelper2;
 import com.ly.qcommesim.qcomm.service.QcommBleService;
-import com.ly.qcommesim.qcomm.widget.VMUpgradeDialog;
 
 import java.io.File;
 import java.text.DecimalFormat;
@@ -27,7 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 
-public class QcommUpgradeActivity2 extends FragmentActivity implements VMUpgradeDialog.UpgradeDialogListener {
+public class QcommUpgradeActivity2 extends FragmentActivity  {
 
     private BleDevice bleDevice;
     private QcommBleService otaUpgradeService1;
@@ -88,7 +86,7 @@ public class QcommUpgradeActivity2 extends FragmentActivity implements VMUpgrade
             }
 
             @Override
-            public void phoneBleDisable() {
+            public void bleIsUnable() {
                 loadingHide("phone ble disable");
             }
 
@@ -178,15 +176,6 @@ public class QcommUpgradeActivity2 extends FragmentActivity implements VMUpgrade
         }
     }
 
-    @Override
-    public void abortUpgrade() {
-        otaUpgradeService1.abortUpgrade();
-    }
-
-    @Override
-    public int getResumePoint() {
-        return (otaUpgradeService1 != null) ? otaUpgradeService1.getResumePoint() : Enums.DATA_TRANSFER;
-    }
 
     @Override
     public void startActivityForResult(Intent intent, int requestCode) {

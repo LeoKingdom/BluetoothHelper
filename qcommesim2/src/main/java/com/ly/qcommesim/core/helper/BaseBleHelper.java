@@ -8,12 +8,18 @@ import android.content.Intent;
 import android.location.LocationManager;
 import android.provider.Settings;
 
+import com.fastble.fastble.BleManager;
+import com.fastble.fastble.callback.BleReadCallback;
 import com.fastble.fastble.data.BleDevice;
+import com.fastble.fastble.exception.BleException;
+import com.ly.qcommesim.core.utils.TransformUtils;
 import com.xble.xble.core.BaseCore;
 import com.xble.xble.core.log.Logg;
 
 public class BaseBleHelper extends BaseCore {
 
+    private ReadFailListener readFailListener;
+    private ReadSuccessListener readSuccessListener;
     public BaseBleHelper(Application app) {
         super(app);
     }
@@ -70,6 +76,20 @@ public class BaseBleHelper extends BaseCore {
         }
     }
 
+    public void read(BleDevice device){
+        BleManager.getInstance().read(device, "0000180A-0000-1000-8000-00805F9B34FB", "00002A28-0000-1000-8000-00805F9B34FB", new BleReadCallback() {
+            @Override
+            public void onReadSuccess(byte[] bytes) {
+                successNext(bytes);
+            }
+
+            @Override
+            public void onReadFailure(BleException e) {
+                failNext(e.getDescription());
+            }
+        });
+    }
+
 
     /*********************打印log方法***********************/
 
@@ -112,4 +132,34 @@ public class BaseBleHelper extends BaseCore {
     private void printError(String text) {
         Logg.t(TAG).recordLog(getClass(), text, Logg.ERROR);
     }
+
+    public interface ReadSuccessListener{
+        void readSuccess(String version);
+    }
+    public interface ReadFailListener{
+        void readFail(String error);
+    }
+
+    public void setReadFailListener(ReadFailListener readFailListener) {
+        this.readFailListener = readFailListener;
+    }
+
+    public void setReadSuccessListener(ReadSuccessListener readSuccessListener) {
+        this.readSuccessListener = readSuccessListener;
+    }
+    private void successNext(byte[] bytes){
+        if (readSuccessListener!=null){
+            String version="";
+            if (bytes!=null){
+                version=TransformUtils.bytes2String(bytes);
+            }
+            readSuccessListener.readSuccess(version);
+        }
+    }
+    private void failNext(String err){
+        if (readFailListener!=null){
+            readFailListener.readFail(err);
+        }
+    }
+
 }

@@ -20,12 +20,14 @@ public class OrderBean {
 
     public OrderBean(byte[] data) {
         this.data = data;
-        setLongL(data[1] & 0xFF);
-        setShortL(data[2] & 0xFF);
-        settFrame(data[3]);
-        setcFrame(data[4]);
-        setModule(data[5]);
-        setEvent(data[6]);
+        if (data.length >= 7) {
+            setLongL(data[1] & 0xFF);
+            setShortL(data[2] & 0xFF);
+            settFrame(data[3]);
+            setcFrame(data[4]);
+            setModule(data[5]);
+            setEvent(data[6]);
+        }
     }
 
     public byte getFirst() {

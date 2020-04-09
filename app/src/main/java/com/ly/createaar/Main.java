@@ -7,13 +7,13 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 
+import androidx.annotation.Nullable;
+
 import com.de.esim.rohttp.Rohttp;
 import com.de.esim.rohttp.helper.callback.HttpCallback;
 import com.de.esim.rohttp.helper.utils.TrustAllCerts;
 
 import java.util.HashMap;
-
-import androidx.annotation.Nullable;
 
 /**
  * author: LingYun
@@ -31,8 +31,8 @@ public class Main extends Activity {
     }
 
     public void toEsim(View view){
-        testEsim();
-        //startActivity(new Intent(this,EsimActivity.class));
+//        testEsim();
+        startActivity(new Intent(this,EsimActivity.class));
     }
     public void toUpgrade(View view){
 //        startActivity(new Intent(this, UpgradeActivity.class));

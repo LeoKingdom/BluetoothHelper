@@ -54,7 +54,8 @@ dependencies {
 //    implementation project(path: ':qualcomm')
     api(name: "de_esim-v0.0.6", ext: 'aar')
 //    api(name: "blehelper", ext: 'aar')
-    api(name: "fastble", ext: 'aar')
-    api(name: "xble", ext: 'aar')
+    api(name: "ma_fastble", ext: 'aar')
+    api(name: "ma_xble", ext: 'aar')
     implementation project(path: ':qcommesim3')
+    api 'com.alibaba:fastjson:1.2.58'
 }

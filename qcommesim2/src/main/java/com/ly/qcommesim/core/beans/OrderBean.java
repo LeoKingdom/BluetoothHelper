@@ -15,16 +15,34 @@ public class OrderBean {
     byte cFrame;
     byte module;
     byte event;
+
+    public byte getResponeByte() {
+        return responeByte;
+    }
+
+    public void setResponeByte(byte responeByte) {
+        this.responeByte = responeByte;
+    }
+
+    byte responeByte;
     private byte[] data;
+
+    public OrderBean() {
+    }
 
     public OrderBean(byte[] data) {
         this.data = data;
-        setLongL(data[1] & 0xFF);
-        setShortL(data[2] & 0xFF);
-        settFrame(data[3]);
-        setcFrame(data[4]);
-        setModule(data[5]);
-        setEvent(data[6]);
+        if (data != null && data.length >= 7) {
+            setLongL(data[1] & 0xFF);
+            setShortL(data[2] & 0xFF);
+            settFrame(data[3]);
+            setcFrame(data[4]);
+            setModule(data[5]);
+            setEvent(data[6]);
+            if (data.length>7){
+                responeByte=data[7];
+            }
+        }
     }
 
     public byte getFirst() {

@@ -29,12 +29,12 @@
             />
 
     </LinearLayout>
-    <com.ly.qcommesim.core.widget.ProgressDialogWidget
+    <com.ly.createaar.wedgit.ProgressDialogWidget
         android:id="@+id/progress_dialog"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="gone"/>
-    <com.ly.qcommesim.core.widget.LoadingWidget
+    <com.ly.createaar.wedgit.LoadingWidget
         android:id="@+id/main_loading_widget"
         android:layout_width="match_parent"
         android:layout_height="match_parent"

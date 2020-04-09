@@ -1,6 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#008577</color>
-    <color name="colorPrimaryDark">#00574B</color>
-    <color name="colorAccent">#D81B60</color>
+    <color name="color_white">#FFFFFF</color>
+    <color name="color_dialog_bg">#4D000000</color>
+    <color name="color_privacy">#398eff</color>
+    <color name="color_black">#000000</color>
+    <color name="color_gray">#cccccc</color>
+    <color name="color_Accent">#D81B60</color>
+    <color name="color_4DCCCCCE">#4DCCCCCE</color>
+    <color name="color_DEFFFFFF">#DEFFFFFF</color>
+    <color name="colorr_8A000000">#8A000000</color>
+    <color name="brand_orange_mid_tone">#EA7600</color>
+    <color name="colorAccent">@color/brand_orange_mid_tone</color>
+    <color name="secondary_text">#8A000000</color>
+    <color name="colorPrimary">@color/brand_blue_mid_tone</color>
+    <color name="colorPrimaryDark">@color/brand_blue_dark_tone</color>
+    <color name="windowBackground">@color/color_white</color>
+    <color name="primary_text">#DE000000</color>
+    <color name="background_toolbar">@color/colorPrimary</color>
+    <color name="brand_blue_dark_tone">#002D72</color>
+    <color name="brand_blue_mid_tone">#0033A0</color>
+    <color name="brand_blue_light_tone">#41B6E6</color>
 </resources>
