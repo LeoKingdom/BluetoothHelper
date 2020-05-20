@@ -17,7 +17,7 @@ import com.de.esim.rohttp.Rohttp;
 import com.de.esim.rohttp.helper.callback.HttpCallback;
 import com.de.esim.rohttp.helper.utils.TrustAllCerts;
 import com.fastble.fastble.data.BleDevice;
-import com.ly.qcommesim.core.widget.LoadingWidget;
+import com.ly.createaar.wedgit.LoadingWidget;
 import com.ly.qcommesim.esim.helper.ESimHelper;
 import com.ly.qcommesim.esim.enums.EsimEnum;
 
