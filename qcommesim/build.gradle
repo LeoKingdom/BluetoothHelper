@@ -41,5 +41,8 @@ dependencies {
     implementation 'androidx.annotation:annotation:1.0.2'
     api(name: "ma_fastble", ext: 'aar')
     api(name: "xble", ext: 'aar')
-    api(name: "de_esim-v0.0.6", ext: 'aar')
+    //api(name: "de_esim-v0.0.6", ext: 'aar')
+    //de_esim拆分为ma_xutils+de_rohttp
+    api(name: "ma_xutils", ext: 'aar')
+    api(name: "de_rohttp-v0.0.7", ext: 'aar')
 }
